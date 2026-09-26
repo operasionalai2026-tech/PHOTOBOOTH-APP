@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Hapus foto (file storage + baris DB) yang lebih tua dari RETENTION_DAYS (default 30).
-// Dijalankan oleh GitHub Actions. Butuh SUPABASE_SERVICE_ROLE_KEY — HANYA dari GitHub Secrets,
+// Dijalankan oleh GitHub Actions. Butuh SUPABASE_SERVICE_ROLE_KEY (secret key `sb_secret_...` atau
+// service_role lama) — HANYA dari GitHub Secrets,
 // jangan pernah dipakai di frontend.
 //
 // Tanpa dependency: pakai fetch bawaan Node 18+.
@@ -19,9 +20,11 @@ if (!url || !key) {
   process.exit(1);
 }
 
+// Key baru (sb_secret_...) cukup di header `apikey` — Supabase menolaknya di `Authorization: Bearer`.
+// Key lama (service_role, JWT "eyJ...") dikirim di keduanya.
 const headers = {
   apikey: key,
-  Authorization: `Bearer ${key}`,
+  ...(key.startsWith('eyJ') ? { Authorization: `Bearer ${key}` } : {}),
   'Content-Type': 'application/json',
 };
 

@@ -28,10 +28,12 @@ jobs:
           if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
             echo "::error::Secrets SUPABASE_URL / SUPABASE_ANON_KEY belum diisi"; exit 1
           fi
+          # Key baru (sb_publishable_...) hanya boleh di header apikey; key lama (JWT) juga di Authorization.
+          AUTH=()
+          case "$SUPABASE_ANON_KEY" in eyJ*) AUTH=(-H "Authorization: Bearer $SUPABASE_ANON_KEY");; esac
           curl -fsS --retry 3 --retry-delay 10 \
             "${SUPABASE_URL%/}/rest/v1/photo_sessions?select=id&limit=1" \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "apikey: $SUPABASE_ANON_KEY" "${AUTH[@]}" \
             -o /dev/null -w "HTTP %{http_code}\n"
 
   cleanup:
