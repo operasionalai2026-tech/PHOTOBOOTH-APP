@@ -7,13 +7,14 @@ import { Icon } from '@/components/ui/Icon';
 import { EVENT } from '@/config/event';
 import { captureFrame, cameraErrorMessage, startCamera, stopCamera, type CameraError } from '@/lib/camera';
 import { playBeep, playShutter } from '@/lib/sound';
+import { useSticky } from '@/lib/useSticky';
 import { useBooth } from '@/lib/store';
 import { StepDots } from './LayoutPicker';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function CaptureScreen() {
-  const layout = useBooth((s) => s.layout)!;
+  const layout = useSticky(useBooth((s) => s.layout))!;
   const setShots = useBooth((s) => s.setShots);
   const go = useBooth((s) => s.go);
   const cameraId = useBooth((s) => s.settings.cameraId);

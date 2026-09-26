@@ -46,6 +46,11 @@ type BoothState = {
 
 const SETTINGS_KEY = 'pb.settings';
 
+/** Bebaskan object URL setelah animasi keluar selesai (gambar masih tampil selama transisi). */
+function revokeLater(url: string) {
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
 const DEFAULT_SETTINGS: Settings = { cameraId: null, autoDrive: false, sound: true };
 
 /** Dibaca setelah mount (bukan saat modul dimuat) supaya tidak bentrok dengan HTML statis. */
@@ -78,7 +83,7 @@ export const useBooth = create<BoothState>((set, get) => ({
   setFilter: (filterId) => set({ filterId }),
   setResult: (result) => {
     const prev = get().result;
-    if (prev && prev.fullUrl !== result.fullUrl) URL.revokeObjectURL(prev.fullUrl);
+    if (prev && prev.fullUrl !== result.fullUrl) revokeLater(prev.fullUrl);
     set({ result, step: 'result', uploadStatus: 'queued', uploadError: null });
   },
   setUpload: (uploadStatus, uploadError = null) => set({ uploadStatus, uploadError }),
@@ -94,7 +99,7 @@ export const useBooth = create<BoothState>((set, get) => ({
   },
   reset: () => {
     const prev = get().result;
-    if (prev) URL.revokeObjectURL(prev.fullUrl);
+    if (prev) revokeLater(prev.fullUrl);
     set({ step: 'start', layout: null, shots: [], result: null, uploadStatus: 'idle', uploadError: null, filterId: 'none' });
   },
 }));

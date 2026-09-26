@@ -11,14 +11,15 @@ import { compressForUpload } from '@/lib/compress';
 import { enqueue, patchMeta, processQueue, subscribe } from '@/lib/offlineQueue';
 import { photoFileName } from '@/lib/saveDevice';
 import { useBooth, type UploadStatus } from '@/lib/store';
+import { useSticky } from '@/lib/useSticky';
 import { isSupabaseConfigured, markPrinted } from '@/lib/supabase';
 import { StepDots } from './LayoutPicker';
 import { PrintArea, printImage } from './PrintArea';
 import { SaveOptions, Spinner } from './SaveOptions';
 
 export function ResultScreen() {
-  const result = useBooth((s) => s.result)!;
-  const layout = useBooth((s) => s.layout)!;
+  const result = useSticky(useBooth((s) => s.result))!;
+  const layout = useSticky(useBooth((s) => s.layout))!;
   const frameId = useBooth((s) => s.frameId);
   const filterId = useBooth((s) => s.filterId);
   const uploadStatus = useBooth((s) => s.uploadStatus);

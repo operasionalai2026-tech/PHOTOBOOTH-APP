@@ -8,13 +8,14 @@ import { EVENT } from '@/config/event';
 import { FILTERS, getFilter } from '@/config/filters';
 import { FRAMES, getFrame } from '@/config/frames';
 import { canvasToBlob, composePhoto } from '@/lib/compose';
+import { useSticky } from '@/lib/useSticky';
 import { useBooth } from '@/lib/store';
 import { uuid } from '@/lib/uuid';
 import { StepDots } from './LayoutPicker';
 import { Spinner } from './SaveOptions';
 
 export function EditScreen() {
-  const layout = useBooth((s) => s.layout)!;
+  const layout = useSticky(useBooth((s) => s.layout))!;
   const shots = useBooth((s) => s.shots);
   const frameId = useBooth((s) => s.frameId);
   const filterId = useBooth((s) => s.filterId);
