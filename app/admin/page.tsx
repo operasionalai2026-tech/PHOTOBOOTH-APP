@@ -65,11 +65,7 @@ function Login() {
     });
     if (error) {
       setStatus('error');
-      setError(
-        error.message.toLowerCase().includes('signups not allowed') || error.status === 422
-          ? 'Email ini bukan admin terdaftar.'
-          : error.message,
-      );
+      setError(loginErrorMessage(error));
     } else setStatus('sent');
   };
 
@@ -111,6 +107,24 @@ function Login() {
       </div>
     </Centered>
   );
+}
+
+/** Terjemahkan error Supabase Auth ke pesan yang jelas untuk operator. */
+function loginErrorMessage(error: { message: string; status?: number; code?: string }): string {
+  const code = error.code ?? '';
+  const msg = error.message.toLowerCase();
+  // Email tidak ada di daftar user (shouldCreateUser: false).
+  if (code === 'otp_disabled' || msg.includes('signups not allowed for otp')) {
+    return 'Email ini bukan admin terdaftar. Minta admin mengundang email ini di Supabase.';
+  }
+  // User ada tapi belum menerima undangan: Supabase menganggapnya pendaftaran baru, padahal sign up dimatikan.
+  if (code === 'signup_disabled' || msg.includes('signups not allowed')) {
+    return 'Akun admin ini belum aktif. Buka email undangan dari Supabase dan klik link-nya dulu, lalu coba lagi.';
+  }
+  if (code === 'over_email_send_rate_limit' || error.status === 429) {
+    return 'Terlalu banyak permintaan email. Tunggu beberapa menit lalu coba lagi (layanan email bawaan Supabase dibatasi per jam).';
+  }
+  return error.message;
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

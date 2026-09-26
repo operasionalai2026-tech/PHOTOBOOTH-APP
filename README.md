@@ -54,7 +54,11 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
    Booth hanya bisa upload ke folder event yang terdaftar & aktif.
 3. **Authentication → Sign In / Providers → Email**: pastikan Email aktif, lalu **matikan “Allow new users to sign up”**.
    Ini penting: policy `admin all` memberi akses penuh ke semua user login, jadi hanya admin yang boleh punya akun.
-4. **Authentication → Users → Invite user**: undang email admin.
+4. **Authentication → Users → Add user → Send invitation**: undang email admin, lalu admin **wajib klik link
+   di email undangan** sekali (sebaiknya setelah langkah 5 supaya redirect-nya benar). Selama undangan belum
+   diterima, login magic link ditolak dengan pesan "Akun admin ini belum aktif".
+   Alternatif: aktifkan langsung lewat SQL Editor —
+   `update auth.users set email_confirmed_at = now() where email = 'admin@contoh.com';`
 5. **Authentication → URL Configuration**:
    - Site URL: `https://<nama-project>.pages.dev`
    - Redirect URLs: tambahkan `https://<nama-project>.pages.dev/admin` (dan `http://localhost:3000/admin` untuk dev).
