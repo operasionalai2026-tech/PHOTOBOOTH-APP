@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warna aksen (format "R G B") — ganti di sini untuk tema event lain. */
+  --accent: 255 90 122;
+  --accent-soft: 255 179 194;
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  background: #0b0a10;
+  color: #f5f3fa;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: Poppins, system-ui, sans-serif;
+  overscroll-behavior: none;
+}
+
+/* Layar booth: cegah seleksi teks tak sengaja di kiosk layar sentuh */
+.booth {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---------- Print: hanya foto yang dicetak, ukuran 4x6 tanpa margin ---------- */
+#print-area {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: 4in 6in;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  body > *:not(#print-area) {
+    display: none !important;
+  }
+  #print-area {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+  }
+  #print-area img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}

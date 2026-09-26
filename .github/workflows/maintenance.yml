@@ -1,0 +1,52 @@
+name: Maintenance (keep-alive & cleanup)
+
+on:
+  schedule:
+    # Tiap 3 hari jam 03:17 UTC (menit acak supaya tidak antre di jam :00)
+    - cron: '17 3 */3 * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Cleanup dry run (tidak menghapus apa pun)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    name: Keep-alive Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Query ringan ke photo_sessions (select 1 row)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::Secrets SUPABASE_URL / SUPABASE_ANON_KEY belum diisi"; exit 1
+          fi
+          curl -fsS --retry 3 --retry-delay 10 \
+            "${SUPABASE_URL%/}/rest/v1/photo_sessions?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -o /dev/null -w "HTTP %{http_code}\n"
+
+  cleanup:
+    name: Hapus foto > 30 hari
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Jalankan scripts/cleanup.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RETENTION_DAYS: '30'
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: node scripts/cleanup.mjs
