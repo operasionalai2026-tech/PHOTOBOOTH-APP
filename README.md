@@ -44,9 +44,14 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
 ### 1. Supabase
 
 1. Buat project di [supabase.com](https://supabase.com) (Free).
-2. Buka `supabase/schema.sql`, **ganti `'nama-event'`** dengan slug event kamu (sama dengan `NEXT_PUBLIC_EVENT_SLUG`),
-   lalu jalankan seluruh isinya di **SQL Editor**. Ini membuat tabel `photo_sessions` + RLS, fungsi `mark_printed`,
-   bucket `photos` (public, 1 MB, JPEG), dan policy storage.
+2. Jalankan seluruh isi `supabase/schema.sql` di **SQL Editor**. Ini membuat tabel `photo_sessions` + RLS,
+   tabel `booth_events` (daftar event yang boleh upload), fungsi `mark_printed`, bucket `photos`
+   (public, 1 MB, JPEG), dan policy storage.
+   Lalu daftarkan slug event kamu (sama dengan `NEXT_PUBLIC_EVENT_SLUG`):
+   ```sql
+   insert into booth_events (slug) values ('nama-event') on conflict do nothing;
+   ```
+   Booth hanya bisa upload ke folder event yang terdaftar & aktif.
 3. **Authentication → Sign In / Providers → Email**: pastikan Email aktif, lalu **matikan “Allow new users to sign up”**.
    Ini penting: policy `admin all` memberi akses penuh ke semua user login, jadi hanya admin yang boleh punya akun.
 4. **Authentication → Users → Invite user**: undang email admin.
@@ -90,7 +95,7 @@ npm run dev                  # http://localhost:3000 (kamera butuh localhost/HTT
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | Project URL Supabase |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key |
-   | `NEXT_PUBLIC_EVENT_SLUG` | mis. `wedding-rina` (harus sama dengan di `schema.sql`) |
+   | `NEXT_PUBLIC_EVENT_SLUG` | mis. `wedding-rina` (harus terdaftar di tabel `booth_events`) |
    | `NEXT_PUBLIC_BASE_URL` | `https://<nama-project>.pages.dev` |
    | `NEXT_PUBLIC_EVENT_NAME` | (opsional) teks di frame, mis. `Rina & Dimas` |
    | `NEXT_PUBLIC_EVENT_TAGLINE` | (opsional) mis. `12 . 10 . 2026` |
