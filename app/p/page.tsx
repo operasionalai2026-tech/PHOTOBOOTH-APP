@@ -149,6 +149,10 @@ function Ready({ row, url }: { row: PhotoSession; url: string }) {
           </div>
         </div>
       </div>
+
+      <a href="/privacy" className="mt-6 text-xs text-white/40 underline">
+        Kebijakan privasi
+      </a>
     </div>
   );
 }
