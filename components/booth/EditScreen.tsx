@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { EVENT } from '@/config/event';
 import { FILTERS, getFilter } from '@/config/filters';
-import { FRAMES, getFrame } from '@/config/frames';
-import { canvasToBlob, composePhoto } from '@/lib/compose';
+import { getFrame } from '@/config/frames';
+import { canvasToBlob, composePhoto, filterThumbnail } from '@/lib/compose';
 import { useSticky } from '@/lib/useSticky';
 import { useBooth } from '@/lib/store';
 import { uuid } from '@/lib/uuid';
@@ -17,9 +17,7 @@ import { Spinner } from './SaveOptions';
 export function EditScreen() {
   const layout = useSticky(useBooth((s) => s.layout))!;
   const shots = useBooth((s) => s.shots);
-  const frameId = useBooth((s) => s.frameId);
   const filterId = useBooth((s) => s.filterId);
-  const setFrame = useBooth((s) => s.setFrame);
   const setFilter = useBooth((s) => s.setFilter);
   const setResult = useBooth((s) => s.setResult);
   const go = useBooth((s) => s.go);
@@ -35,7 +33,7 @@ export function EditScreen() {
       const canvas = await composePhoto({
         shots,
         layout,
-        frame: getFrame(frameId),
+        frame: getFrame(layout.frameId),
         filter: getFilter(filterId),
         title: EVENT.name,
         tagline: EVENT.tagline,
@@ -44,17 +42,13 @@ export function EditScreen() {
       if (id === renderId.current) setPreview(canvas.toDataURL('image/jpeg', 0.85));
     }, 40);
     return () => clearTimeout(t);
-  }, [shots, layout, frameId, filterId]);
+  }, [shots, layout, filterId]);
 
-  const filterThumb = useMemo(() => {
+  // Thumbnail tiap filter dirender dengan filter sungguhan dari foto pertama.
+  const filterThumbs = useMemo(() => {
     const src = shots[0];
-    if (!src) return '';
-    const c = document.createElement('canvas');
-    c.width = 160;
-    c.height = 160;
-    const s = Math.min(src.width, src.height);
-    c.getContext('2d')!.drawImage(src, (src.width - s) / 2, (src.height - s) / 2, s, s, 0, 0, 160, 160);
-    return c.toDataURL('image/jpeg', 0.8);
+    if (!src) return {} as Record<string, string>;
+    return Object.fromEntries(FILTERS.map((f) => [f.id, filterThumbnail(src, f, 220).toDataURL('image/jpeg', 0.85)]));
   }, [shots]);
 
   const finish = async () => {
@@ -63,7 +57,7 @@ export function EditScreen() {
       const full = await composePhoto({
         shots,
         layout,
-        frame: getFrame(frameId),
+        frame: getFrame(layout.frameId),
         filter: getFilter(filterId),
         title: EVENT.name,
         tagline: EVENT.tagline,
@@ -112,29 +106,20 @@ export function EditScreen() {
         </div>
 
         {/* Kontrol */}
-        <div className="flex min-h-0 flex-col gap-6 overflow-y-auto scrollbar-none pb-4">
-          <section>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Frame</h3>
-            <div className="grid grid-cols-5 gap-3 lg:grid-cols-3">
-              {FRAMES.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setFrame(f.id)}
-                  className={`group flex flex-col items-center gap-2 rounded-2xl p-2 transition ${
-                    f.id === frameId ? 'bg-white/10 ring-2 ring-accent' : 'ring-1 ring-white/10 hover:bg-white/5'
-                  }`}
-                >
-                  <span className="aspect-[2/3] w-full rounded-lg ring-1 ring-black/10" style={{ background: f.swatch }} />
-                  <span className="text-xs font-medium text-white/80">{f.name}</span>
-                </button>
-              ))}
+        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto scrollbar-none pb-4">
+          <div className="rounded-2xl bg-white/[0.06] px-4 py-3 ring-1 ring-white/10">
+            <div className="text-xs uppercase tracking-widest text-white/45">Gaya</div>
+            <div className="mt-0.5 flex items-baseline justify-between">
+              <span className="text-lg font-semibold">{layout.name}</span>
+              <span className="text-sm text-white/55">
+                {layout.description} · {layout.sizeLabel}
+              </span>
             </div>
-          </section>
+          </div>
 
           <section>
             <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-white/50">Filter</h3>
-            <div className="grid grid-cols-4 gap-3 sm:grid-cols-7 lg:grid-cols-3">
+            <div className="grid grid-cols-4 gap-3 lg:grid-cols-2">
               {FILTERS.map((f) => (
                 <button
                   key={f.id}
@@ -144,15 +129,13 @@ export function EditScreen() {
                     f.id === filterId ? 'bg-white/10 ring-2 ring-accent' : 'ring-1 ring-white/10 hover:bg-white/5'
                   }`}
                 >
-                  {filterThumb && (
-                    <img
-                      src={filterThumb}
-                      alt=""
-                      className="aspect-square w-full rounded-lg object-cover"
-                      style={{ filter: f.css }}
-                    />
+                  {filterThumbs[f.id] && (
+                    <img src={filterThumbs[f.id]} alt="" className="aspect-square w-full rounded-lg object-cover" />
                   )}
-                  <span className="text-xs font-medium text-white/80">{f.name}</span>
+                  <span className="text-sm font-semibold text-white/90">{f.name}</span>
+                  <span className="-mt-1.5 hidden text-center text-[11px] leading-tight text-white/45 sm:block">
+                    {f.description}
+                  </span>
                 </button>
               ))}
             </div>

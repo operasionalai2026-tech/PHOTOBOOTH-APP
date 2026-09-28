@@ -37,6 +37,7 @@ export function CaptureScreen() {
   const soundOn = useBooth((s) => s.settings.sound);
 
   const total = layout.slots.length;
+  const slotAspect = layout.slots[0].w / layout.slots[0].h;
 
   // Kembali dari layar Hias ("Ubah foto") → langsung ke review dengan foto yang sudah ada.
   const [initial] = useState(() => {
@@ -50,6 +51,7 @@ export function CaptureScreen() {
   const shotsRef = useRef<Slot<HTMLCanvasElement>>(initial ?? Array(total).fill(null));
 
   const [ready, setReady] = useState(false);
+  const [videoAspect, setVideoAspect] = useState(16 / 9);
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>(initial ? 'review' : 'idle');
   const [active, setActive] = useState<number | null>(null);
@@ -67,7 +69,9 @@ export function CaptureScreen() {
     setReady(false);
     stopCamera(streamRef.current);
     try {
-      streamRef.current = await startCamera(videoRef.current!, cameraId ?? undefined);
+      const video = videoRef.current!;
+      streamRef.current = await startCamera(video, cameraId ?? undefined);
+      if (video.videoWidth && video.videoHeight) setVideoAspect(video.videoWidth / video.videoHeight);
       setReady(true);
     } catch (e) {
       setError(cameraErrorMessage(((e as { code?: CameraError }).code ?? 'unknown') as CameraError));
@@ -155,8 +159,19 @@ export function CaptureScreen() {
         </div>
       </header>
 
-      <div className="relative mx-auto mt-4 flex min-h-0 w-full max-w-6xl flex-1 items-center justify-center">
-        <div className="relative aspect-[4/3] max-h-full w-full overflow-hidden rounded-[2rem] bg-ink-800 ring-1 ring-white/10 sm:aspect-video">
+      <div
+        className="relative mx-auto mt-4 flex min-h-0 w-full max-w-6xl flex-1 items-center justify-center"
+        style={{ containerType: 'size' }}
+      >
+        {/* Kotak video mengikuti rasio kamera asli supaya panduan bingkai akurat */}
+        <div
+          className="relative overflow-hidden rounded-[2rem] bg-ink-800 ring-1 ring-white/10"
+          style={{
+            width: `min(100cqw, calc(100cqh * ${videoAspect}))`,
+            height: `min(100cqh, calc(100cqw / ${videoAspect}))`,
+            containerType: 'size',
+          }}
+        >
           <video
             ref={videoRef}
             className="h-full w-full object-cover"
@@ -165,6 +180,18 @@ export function CaptureScreen() {
             muted
             autoPlay
           />
+
+          {/* Panduan bingkai: area di luar kotak tidak masuk ke foto */}
+          {ready && (
+            <div
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-dashed border-white/70"
+              style={{
+                width: `min(100cqw, calc(100cqh * ${slotAspect}))`,
+                height: `min(100cqh, calc(100cqw / ${slotAspect}))`,
+                boxShadow: '0 0 0 100vmax rgba(0, 0, 0, 0.4)',
+              }}
+            />
+          )}
 
           {/* Tahap 1: siap-siap */}
           <AnimatePresence>

@@ -24,7 +24,6 @@ type BoothState = {
   step: Step;
   layout: Layout | null;
   shots: HTMLCanvasElement[];
-  frameId: string;
   filterId: string;
   result: BoothResult | null;
   uploadStatus: UploadStatus;
@@ -35,7 +34,6 @@ type BoothState = {
   go: (step: Step) => void;
   chooseLayout: (layout: Layout) => void;
   setShots: (shots: HTMLCanvasElement[]) => void;
-  setFrame: (id: string) => void;
   setFilter: (id: string) => void;
   setResult: (r: BoothResult) => void;
   setUpload: (status: UploadStatus, error?: string | null) => void;
@@ -71,7 +69,6 @@ export const useBooth = create<BoothState>((set, get) => ({
   step: 'start',
   layout: null,
   shots: [],
-  frameId: 'classic',
   filterId: 'none',
   result: null,
   uploadStatus: 'idle',
@@ -82,7 +79,6 @@ export const useBooth = create<BoothState>((set, get) => ({
   go: (step) => set({ step }),
   chooseLayout: (layout) => set({ layout, shots: [], step: 'capture' }),
   setShots: (shots) => set({ shots, step: 'edit' }),
-  setFrame: (frameId) => set({ frameId }),
   setFilter: (filterId) => set({ filterId }),
   setResult: (result) => {
     const prev = get().result;

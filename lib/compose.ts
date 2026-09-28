@@ -20,7 +20,8 @@ const loadedFonts = new Set<string>();
 export async function ensureFonts(fonts: string[]) {
   if (typeof document === 'undefined' || !document.fonts) return;
   const pending = fonts.filter((f) => !loadedFonts.has(f));
-  await Promise.all(
+  if (!pending.length) return;
+  const all = Promise.all(
     pending.map((f) =>
       document.fonts
         .load(f)
@@ -28,6 +29,8 @@ export async function ensureFonts(fonts: string[]) {
         .catch(() => undefined),
     ),
   );
+  // Jangan biarkan koneksi lambat/offline menahan booth: lewat 2,5 detik pakai font cadangan.
+  await Promise.race([all, new Promise((r) => setTimeout(r, 2500))]);
 }
 
 export async function composePhoto(input: ComposeInput): Promise<HTMLCanvasElement> {
@@ -47,8 +50,12 @@ export async function composePhoto(input: ComposeInput): Promise<HTMLCanvasEleme
   layout.slots.forEach((slot, i) => {
     const shot = shots[i] ?? shots[shots.length - 1];
     if (!shot) return;
-    const filtered = applyFilter(shot, filter, Math.max(slot.w, slot.h) * scale);
-    drawCover(ctx, filtered, slot, frame.photoRadius);
+    const photo = renderSlotPhoto(shot, slot.w / slot.h, Math.round(slot.w * scale), Math.round(slot.h * scale), filter);
+    ctx.save();
+    roundRectPath(ctx, slot, frame.photoRadius);
+    ctx.clip();
+    ctx.drawImage(photo, slot.x, slot.y, slot.w, slot.h);
+    ctx.restore();
     if (frame.photoStroke) {
       ctx.save();
       ctx.strokeStyle = frame.photoStroke.color;
@@ -63,9 +70,9 @@ export async function composePhoto(input: ComposeInput): Promise<HTMLCanvasEleme
   return canvas;
 }
 
-/** Gandakan strip 2x6 jadi satu kertas 4x6 (dua strip berdampingan, tinggal digunting). */
+/** Strip 2x6 digandakan jadi satu kertas 4x6 (dua strip berdampingan, tinggal digunting). */
 export function toPrintSheet(photo: HTMLCanvasElement, layout: Layout): HTMLCanvasElement {
-  if (layout.id !== 'strip') return photo;
+  if (layout.print.copies === 1) return photo;
   const sheet = document.createElement('canvas');
   sheet.width = photo.width * 2;
   sheet.height = photo.height;
@@ -73,6 +80,11 @@ export function toPrintSheet(photo: HTMLCanvasElement, layout: Layout): HTMLCanv
   ctx.drawImage(photo, 0, 0);
   ctx.drawImage(photo, photo.width, 0);
   return sheet;
+}
+
+/** Thumbnail persegi dengan filter (untuk pemilih filter). */
+export function filterThumbnail(src: HTMLCanvasElement, filter: Filter, size: number): HTMLCanvasElement {
+  return renderSlotPhoto(src, 1, size, size, filter);
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', quality = 0.95): Promise<Blob> {
@@ -92,51 +104,28 @@ function roundRectPath(ctx: CanvasRenderingContext2D, r: Rect, radius: number) {
   }
 }
 
-/** Gambar sumber memenuhi slot (object-fit: cover), dipotong di tengah. */
-function drawCover(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, slot: Rect, radius: number) {
-  const srcRatio = src.width / src.height;
-  const slotRatio = slot.w / slot.h;
+/**
+ * Potong sumber sesuai rasio slot (object-fit: cover, di tengah), ubah ke ukuran target,
+ * lalu terapkan filter. Filter dijalankan setelah dipotong supaya cepat & resolusinya penuh.
+ */
+function renderSlotPhoto(src: HTMLCanvasElement, ratio: number, w: number, h: number, filter: Filter): HTMLCanvasElement {
   let sw = src.width;
   let sh = src.height;
-  if (srcRatio > slotRatio) sw = sh * slotRatio;
-  else sh = sw / slotRatio;
+  if (sw / sh > ratio) sw = sh * ratio;
+  else sh = sw / ratio;
   const sx = (src.width - sw) / 2;
   const sy = (src.height - sh) / 2;
-  ctx.save();
-  roundRectPath(ctx, slot, radius);
-  ctx.clip();
-  ctx.drawImage(src, sx, sy, sw, sh, slot.x, slot.y, slot.w, slot.h);
-  ctx.restore();
-}
 
-/**
- * Terapkan color matrix per pixel. Sumber diperkecil dulu seperlunya (maxSide)
- * supaya cepat — tidak ada gunanya memfilter 4K kalau slot cuma 1080px.
- */
-function applyFilter(src: HTMLCanvasElement, filter: Filter, maxSide: number): HTMLCanvasElement {
-  const ratio = Math.min(1, maxSide / Math.max(src.width, src.height));
-  const w = Math.max(1, Math.round(src.width * ratio));
-  const h = Math.max(1, Math.round(src.height * ratio));
   const out = document.createElement('canvas');
-  out.width = w;
-  out.height = h;
-  const ctx = out.getContext('2d', { willReadFrequently: !!filter.matrix })!;
+  out.width = Math.max(1, w);
+  out.height = Math.max(1, h);
+  const ctx = out.getContext('2d', { willReadFrequently: !!filter.apply })!;
   ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(src, 0, 0, w, h);
-  const m = filter.matrix;
-  if (!m) return out;
-
-  const img = ctx.getImageData(0, 0, w, h);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i];
-    const g = d[i + 1];
-    const b = d[i + 2];
-    d[i] = m[0] * r + m[1] * g + m[2] * b + m[4];
-    d[i + 1] = m[5] * r + m[6] * g + m[7] * b + m[9];
-    d[i + 2] = m[10] * r + m[11] * g + m[12] * b + m[14];
-    // Uint8ClampedArray otomatis clamp 0..255
+  ctx.drawImage(src, sx, sy, sw, sh, 0, 0, out.width, out.height);
+  if (filter.apply) {
+    const img = ctx.getImageData(0, 0, out.width, out.height);
+    filter.apply(img);
+    ctx.putImageData(img, 0, 0);
   }
-  ctx.putImageData(img, 0, 0);
   return out;
 }

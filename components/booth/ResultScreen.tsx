@@ -14,13 +14,12 @@ import { useBooth, type UploadStatus } from '@/lib/store';
 import { useSticky } from '@/lib/useSticky';
 import { isSupabaseConfigured, markPrinted } from '@/lib/supabase';
 import { StepDots } from './LayoutPicker';
-import { PrintArea, printImage } from './PrintArea';
+import { PrintArea, printImage, type PrintJob } from './PrintArea';
 import { SaveOptions, Spinner } from './SaveOptions';
 
 export function ResultScreen() {
   const result = useSticky(useBooth((s) => s.result))!;
   const layout = useSticky(useBooth((s) => s.layout))!;
-  const frameId = useBooth((s) => s.frameId);
   const filterId = useBooth((s) => s.filterId);
   const uploadStatus = useBooth((s) => s.uploadStatus);
   const uploadError = useBooth((s) => s.uploadError);
@@ -31,7 +30,7 @@ export function ResultScreen() {
 
   const [qr, setQr] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
-  const [printUrl, setPrintUrl] = useState<string | null>(null);
+  const [printJob, setPrintJob] = useState<PrintJob | null>(null);
   const [idleLeft, setIdleLeft] = useState<number | null>(null);
   const started = useRef(false);
 
@@ -58,7 +57,7 @@ export function ResultScreen() {
         await enqueue(small, {
           id: result.id,
           layout: layout.id,
-          frame: frameId,
+          frame: layout.frameId,
           filter: getFilter(filterId).id,
           size_bytes: small.size,
         });
@@ -71,7 +70,7 @@ export function ResultScreen() {
         setUpload('error', e instanceof Error ? e.message : 'Gagal menyiapkan upload');
       }
     })();
-  }, [result, layout.id, frameId, filterId, setUpload]);
+  }, [result, layout.id, layout.frameId, filterId, setUpload]);
 
   // 2) QR code ke halaman download.
   useEffect(() => {
@@ -103,8 +102,7 @@ export function ResultScreen() {
   const print = async () => {
     setPrinting(true);
     try {
-      const sheetUrl = await printImage(result.fullUrl, layout);
-      setPrintUrl(sheetUrl);
+      setPrintJob(await printImage(result.fullUrl, layout));
       // tunggu <img> print dimuat baru panggil print()
       await new Promise((r) => setTimeout(r, 250));
       window.print();
@@ -204,7 +202,7 @@ export function ResultScreen() {
         </div>
       </div>
 
-      <PrintArea src={printUrl} />
+      <PrintArea job={printJob} />
     </div>
   );
 }

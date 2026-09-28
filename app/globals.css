@@ -36,16 +36,13 @@ body {
   display: none;
 }
 
-/* ---------- Print: hanya foto yang dicetak, ukuran 4x6 tanpa margin ---------- */
+/* ---------- Print: hanya foto yang dicetak, tanpa margin.
+   Ukuran kertas (@page size) di-set per gaya oleh components/booth/PrintArea.tsx ---------- */
 #print-area {
   display: none;
 }
 
 @media print {
-  @page {
-    size: 4in 6in;
-    margin: 0;
-  }
   html,
   body {
     background: #fff !important;

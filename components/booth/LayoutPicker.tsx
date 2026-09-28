@@ -1,9 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { EVENT } from '@/config/event';
+import { getFilter } from '@/config/filters';
+import { getFrame } from '@/config/frames';
 import { LAYOUTS, type Layout } from '@/config/layouts';
+import { composePhoto } from '@/lib/compose';
 import { useBooth } from '@/lib/store';
 
 export function LayoutPicker() {
@@ -11,7 +16,7 @@ export function LayoutPicker() {
   const reset = useBooth((s) => s.reset);
 
   return (
-    <div className="flex flex-1 flex-col px-5 py-6 sm:px-10 sm:py-10">
+    <div className="flex min-h-0 flex-1 flex-col px-5 py-6 sm:px-10 sm:py-8">
       <header className="flex items-center justify-between">
         <Button variant="ghost" size="md" onClick={reset}>
           <Icon name="arrow-left" /> Kembali
@@ -20,12 +25,12 @@ export function LayoutPicker() {
         <div className="w-24" />
       </header>
 
-      <div className="mt-6 text-center">
+      <div className="mt-4 text-center">
         <h2 className="font-display text-4xl font-semibold sm:text-5xl">Pilih gaya foto</h2>
-        <p className="mt-2 text-white/55">Kamu bisa ganti frame & filter setelah foto diambil</p>
+        <p className="mt-2 text-white/55">Filter bisa dipilih setelah foto diambil</p>
       </div>
 
-      <div className="mx-auto mt-10 grid w-full max-w-5xl flex-1 grid-cols-1 content-center gap-5 sm:grid-cols-3 sm:gap-7">
+      <div className="mx-auto mt-8 grid w-full max-w-6xl flex-1 grid-cols-2 content-center gap-4 sm:gap-6 lg:grid-cols-4">
         {LAYOUTS.map((layout, i) => (
           <motion.button
             key={layout.id}
@@ -33,15 +38,17 @@ export function LayoutPicker() {
             onClick={() => chooseLayout(layout)}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08 * i, type: 'spring', stiffness: 200, damping: 20 }}
+            transition={{ delay: 0.07 * i, type: 'spring', stiffness: 200, damping: 20 }}
             whileHover={{ y: -6 }}
             whileTap={{ scale: 0.97 }}
-            className="group flex items-center gap-5 rounded-3xl bg-white/[0.06] p-5 text-left ring-1 ring-white/10 transition hover:bg-white/10 hover:ring-accent/60 sm:flex-col sm:p-7 sm:text-center"
+            className="group flex flex-col items-center gap-4 rounded-3xl bg-white/[0.06] p-4 text-center ring-1 ring-white/10 transition hover:bg-white/10 hover:ring-accent/60 sm:p-6"
           >
             <LayoutThumb layout={layout} />
             <div>
-              <div className="text-2xl font-semibold">{layout.name}</div>
-              <div className="mt-1 text-white/55">{layout.description}</div>
+              <div className="text-xl font-semibold sm:text-2xl">{layout.name}</div>
+              <div className="mt-1 text-sm text-white/55">
+                {layout.description} · {layout.sizeLabel}
+              </div>
             </div>
           </motion.button>
         ))}
@@ -50,26 +57,64 @@ export function LayoutPicker() {
   );
 }
 
-export function LayoutThumb({ layout, className = 'h-32 sm:h-52' }: { layout: Layout; className?: string }) {
+// ---------- pratinjau frame asli dengan foto contoh ----------
+
+const thumbCache = new Map<string, string>();
+
+/** Foto contoh (siluet) untuk mengisi slot pratinjau. */
+function placeholderShot(): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = 640;
+  c.height = 480;
+  const ctx = c.getContext('2d')!;
+  const g = ctx.createLinearGradient(0, 0, 640, 480);
+  g.addColorStop(0, '#c9c2dc');
+  g.addColorStop(1, '#f0cfdc');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 640, 480);
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.beginPath();
+  ctx.arc(320, 200, 70, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(320, 430, 150, 130, 0, 0, Math.PI * 2);
+  ctx.fill();
+  return c;
+}
+
+export function LayoutThumb({ layout }: { layout: Layout }) {
+  const [src, setSrc] = useState(() => thumbCache.get(layout.id) ?? null);
+
+  useEffect(() => {
+    if (thumbCache.has(layout.id)) return;
+    let alive = true;
+    const shot = placeholderShot();
+    composePhoto({
+      shots: layout.slots.map(() => shot),
+      layout,
+      frame: getFrame(layout.frameId),
+      filter: getFilter('none'),
+      title: EVENT.name,
+      tagline: EVENT.tagline,
+      scale: 520 / layout.height,
+    }).then((canvas) => {
+      const url = canvas.toDataURL('image/png');
+      thumbCache.set(layout.id, url);
+      if (alive) setSrc(url);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [layout]);
+
   return (
-    <svg
-      viewBox={`0 0 ${layout.width} ${layout.height}`}
-      className={`${className} shrink-0 drop-shadow-xl transition group-hover:drop-shadow-2xl`}
-      aria-hidden="true"
-    >
-      <rect width={layout.width} height={layout.height} rx={24} fill="#fbf8f3" />
-      {layout.slots.map((s, i) => (
-        <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} rx={10} className="fill-accent/70" />
-      ))}
-      <rect
-        x={layout.width * 0.25}
-        y={layout.footer.y + layout.footer.h * 0.42}
-        width={layout.width * 0.5}
-        height={Math.max(24, layout.footer.h * 0.12)}
-        rx={12}
-        fill="#d9cfc0"
-      />
-    </svg>
+    <div className="flex h-52 w-full items-center justify-center sm:h-64">
+      {src ? (
+        <img src={src} alt={`Contoh ${layout.name}`} className="h-full w-auto max-w-full rounded-md object-contain drop-shadow-xl" />
+      ) : (
+        <div className="h-full w-2/3 animate-pulse rounded-md bg-white/10" />
+      )}
+    </div>
   );
 }
 
