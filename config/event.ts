@@ -6,10 +6,10 @@ export const EVENT = {
   tagline: process.env.NEXT_PUBLIC_EVENT_TAGLINE || '',
   baseUrl: (process.env.NEXT_PUBLIC_BASE_URL || '').replace(/\/+$/, ''),
 
-  /** Detik hitung mundur sebelum tiap jepretan. */
+  /** Detik "siap-siap" (tahap 1) sebelum hitung mundur tiap jepretan — waktu tamu atur gaya. */
+  prepareSeconds: 3,
+  /** Detik hitung mundur 3-2-1 (tahap 2) sebelum jepret. */
   countdownSeconds: 3,
-  /** Jeda antar jepretan (ms) supaya tamu sempat ganti gaya. */
-  betweenShotsMs: 1200,
   /** Mirror kamera depan (lebih natural untuk selfie). */
   mirror: true,
   /** Kembali otomatis ke layar awal kalau layar hasil didiamkan (ms). 0 = mati. */
@@ -20,6 +20,13 @@ export const EVENT = {
    * public/sounds/shutter.mp3). Kalau kosong, suara shutter disintesis via Web Audio.
    */
   shutterSoundUrl: '',
+};
+
+/** Teks layar "siap-siap" sebelum hitung mundur. Ubah di sini untuk gaya bahasa event lain. */
+export const PREPARE_TEXT = {
+  first: (seconds: number) => `Oke, siap-siap dijepret ya! Gw kasih ${seconds} detik buat siap 😎`,
+  next: (n: number, total: number) => `Foto ke-${n} dari ${total}, ganti gaya!`,
+  retake: (n: number) => `Ulang foto ke-${n}, siap-siap ya!`,
 };
 
 /** Aturan free tier Supabase + retensi foto. */

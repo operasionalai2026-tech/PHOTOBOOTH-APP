@@ -84,7 +84,7 @@ export function EditScreen() {
     <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-8 sm:py-6">
       <header className="flex items-center justify-between">
         <Button variant="ghost" onClick={() => go('capture')} disabled={finishing}>
-          <Icon name="refresh" /> Foto ulang
+          <Icon name="arrow-left" /> Ubah foto
         </Button>
         <StepDots active={2} />
         <Button onClick={finish} disabled={finishing || !preview}>

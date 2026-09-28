@@ -27,6 +27,7 @@ export function ResultScreen() {
   const setUpload = useBooth((s) => s.setUpload);
   const autoDrive = useBooth((s) => s.settings.autoDrive);
   const reset = useBooth((s) => s.reset);
+  const restart = useBooth((s) => s.restart);
 
   const [qr, setQr] = useState<string | null>(null);
   const [printing, setPrinting] = useState(false);
@@ -117,12 +118,8 @@ export function ResultScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-8 sm:py-6">
-      <header className="flex items-center justify-between">
-        <div className="w-32" />
+      <header className="flex items-center justify-center py-2">
         <StepDots active={3} />
-        <Button variant="secondary" onClick={reset}>
-          Selesai <Icon name="check" />
-        </Button>
       </header>
 
       <div className="mx-auto mt-4 grid min-h-0 w-full max-w-6xl flex-1 items-center gap-8 lg:grid-cols-[1fr_420px]">
@@ -181,6 +178,16 @@ export function ResultScreen() {
             {printing ? <Spinner className="h-5 w-5" /> : <Icon name="printer" />}
             Cetak foto
           </Button>
+
+          {/* Foto lagi (tamu yang sama) atau selesai (tamu berikutnya) */}
+          <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-5">
+            <Button size="lg" variant="secondary" onClick={restart}>
+              <Icon name="camera" /> Foto Ulang
+            </Button>
+            <Button size="lg" onClick={reset}>
+              Selesai <Icon name="check" />
+            </Button>
+          </div>
 
           <AnimatePresence>
             {idleLeft !== null && (

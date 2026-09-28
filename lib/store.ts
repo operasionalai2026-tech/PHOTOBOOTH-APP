@@ -41,7 +41,10 @@ type BoothState = {
   setUpload: (status: UploadStatus, error?: string | null) => void;
   setQueueCount: (n: number) => void;
   updateSettings: (s: Partial<Settings>) => void;
+  /** Kembali ke layar awal (tamu berikutnya). */
   reset: () => void;
+  /** "Foto Ulang": tamu yang sama foto lagi, mulai dari pilih gaya. */
+  restart: () => void;
 };
 
 const SETTINGS_KEY = 'pb.settings';
@@ -101,5 +104,10 @@ export const useBooth = create<BoothState>((set, get) => ({
     const prev = get().result;
     if (prev) revokeLater(prev.fullUrl);
     set({ step: 'start', layout: null, shots: [], result: null, uploadStatus: 'idle', uploadError: null, filterId: 'none' });
+  },
+  restart: () => {
+    const prev = get().result;
+    if (prev) revokeLater(prev.fullUrl);
+    set({ step: 'layout', layout: null, shots: [], result: null, uploadStatus: 'idle', uploadError: null, filterId: 'none' });
   },
 }));

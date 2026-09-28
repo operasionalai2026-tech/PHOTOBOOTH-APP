@@ -14,8 +14,12 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
 
 ## Fitur
 
-- **Booth** (`/`): 3 layout (Klasik 4x6, Strip 2x6, Grid 4 foto), countdown + suara shutter + flash,
+- **Booth** (`/`): 3 layout (Klasik 4x6, Strip 2x6, Grid 4 foto). Tiap jepretan dua tahap:
+  **3 detik siap-siap** (animasi "Oke, siap-siap dijepret ya!") lalu **hitung mundur 3-2-1** + suara shutter + flash.
+  Setelah semua foto terambil ada layar review dengan **Retake per foto** (atau Ulang semua).
   5 frame (Classic, Noir Gold, Confetti, Retro 70s, Bloom), 7 filter, preview live.
+  Di layar hasil: **Foto Ulang** (tamu yang sama, kembali ke pilih gaya) atau **Selesai** (layar awal).
+  Durasi & teks siap-siap diatur di `config/event.ts` (`prepareSeconds`, `countdownSeconds`, `PREPARE_TEXT`).
 - **Simpan: Perangkat / Google Drive** — muncul di layar hasil booth, halaman unduh tamu, dan galeri admin.
   - *Perangkat*: di HP membuka share sheet (bisa “Simpan Gambar” ke galeri), di laptop/kiosk jadi download.
   - *Google Drive*: login Google sekali, foto masuk ke folder `Photobooth - <nama event>`.
