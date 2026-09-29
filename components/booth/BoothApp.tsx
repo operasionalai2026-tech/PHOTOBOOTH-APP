@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { Backdrop } from '@/components/ui/Backdrop';
+import { preloadAllArt } from '@/lib/compose';
 import { getAll, startAutoRetry, subscribe } from '@/lib/offlineQueue';
 import { loadSettings, useBooth } from '@/lib/store';
 import { CaptureScreen } from './CaptureScreen';
@@ -19,6 +20,7 @@ export function BoothApp() {
   // Pengaturan operator (kamera, suara, auto-Drive) dari localStorage.
   useEffect(() => {
     updateSettings(loadSettings());
+    preloadAllArt();
   }, [updateSettings]);
 
   // Retry upload otomatis + hitung antrian.

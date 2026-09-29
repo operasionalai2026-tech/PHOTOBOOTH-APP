@@ -4,9 +4,7 @@ import { motion } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { EVENT } from '@/config/event';
 import { FILTERS, getFilter } from '@/config/filters';
-import { getFrame } from '@/config/frames';
 import { canvasToBlob, composePhoto, filterThumbnail } from '@/lib/compose';
 import { useSticky } from '@/lib/useSticky';
 import { useBooth } from '@/lib/store';
@@ -33,10 +31,7 @@ export function EditScreen() {
       const canvas = await composePhoto({
         shots,
         layout,
-        frame: getFrame(layout.frameId),
         filter: getFilter(filterId),
-        title: EVENT.name,
-        tagline: EVENT.tagline,
         scale: 0.4,
       });
       if (id === renderId.current) setPreview(canvas.toDataURL('image/jpeg', 0.85));
@@ -57,10 +52,7 @@ export function EditScreen() {
       const full = await composePhoto({
         shots,
         layout,
-        frame: getFrame(layout.frameId),
         filter: getFilter(filterId),
-        title: EVENT.name,
-        tagline: EVENT.tagline,
       });
       const fullBlob = await canvasToBlob(full, 'image/jpeg', 0.95);
       setResult({

@@ -20,7 +20,6 @@ const config: Config = {
       fontFamily: {
         sans: ['Poppins', 'system-ui', 'sans-serif'],
         display: ['"Playfair Display"', 'Georgia', 'serif'],
-        script: ['Pacifico', 'cursive'],
       },
       boxShadow: {
         glow: '0 0 0 1px rgb(var(--accent) / 0.4), 0 10px 40px -10px rgb(var(--accent) / 0.6)',

@@ -57,7 +57,7 @@ export function ResultScreen() {
         await enqueue(small, {
           id: result.id,
           layout: layout.id,
-          frame: layout.frameId,
+          frame: layout.id,
           filter: getFilter(filterId).id,
           size_bytes: small.size,
         });
@@ -70,7 +70,7 @@ export function ResultScreen() {
         setUpload('error', e instanceof Error ? e.message : 'Gagal menyiapkan upload');
       }
     })();
-  }, [result, layout.id, layout.frameId, filterId, setUpload]);
+  }, [result, layout.id, filterId, setUpload]);
 
   // 2) QR code ke halaman download.
   useEffect(() => {

@@ -4,9 +4,7 @@ import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { EVENT } from '@/config/event';
 import { getFilter } from '@/config/filters';
-import { getFrame } from '@/config/frames';
 import { LAYOUTS, type Layout } from '@/config/layouts';
 import { composePhoto } from '@/lib/compose';
 import { useBooth } from '@/lib/store';
@@ -30,7 +28,7 @@ export function LayoutPicker() {
         <p className="mt-2 text-white/55">Filter bisa dipilih setelah foto diambil</p>
       </div>
 
-      <div className="mx-auto mt-8 grid w-full max-w-6xl flex-1 grid-cols-2 content-center gap-4 sm:gap-6 lg:grid-cols-4">
+      <div className="mx-auto mt-6 grid w-full max-w-7xl flex-1 grid-cols-2 content-center gap-4 sm:grid-cols-3 sm:gap-5 xl:grid-cols-6">
         {LAYOUTS.map((layout, i) => (
           <motion.button
             key={layout.id}
@@ -92,10 +90,7 @@ export function LayoutThumb({ layout }: { layout: Layout }) {
     composePhoto({
       shots: layout.slots.map(() => shot),
       layout,
-      frame: getFrame(layout.frameId),
       filter: getFilter('none'),
-      title: EVENT.name,
-      tagline: EVENT.tagline,
       scale: 520 / layout.height,
     }).then((canvas) => {
       const url = canvas.toDataURL('image/png');

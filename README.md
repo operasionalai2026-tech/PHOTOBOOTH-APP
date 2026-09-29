@@ -14,21 +14,24 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
 
 ## Fitur
 
-- **Booth** (`/`): 4 gaya, masing-masing dengan frame & ukuran cetaknya sendiri:
+- **Booth** (`/`): 6 gaya frame **Remisya – One Story**:
 
   | Gaya | Foto | Ukuran cetak |
   |---|---|---|
-  | Polaroid | 1 (persegi) | 6x8 in |
-  | Instagram (tampilan postingan IG) | 1 (persegi) | 5x7 in |
-  | Strip Pita (bingkai pink + pita satin) | 3 | 2x6 in — 2 strip per kertas 4x6 |
-  | Strip Klasik (bingkai putih) | 4 (landscape) | 2x6 in — 2 strip per kertas 4x6 |
+  | Bingkai Unik (jendela bergelombang) | 4 | 8x10 in |
+  | Grid | 4 | 8x10 in |
+  | Satu Foto | 1 | 8x10 in |
+  | Strip Kolase | 3 | 2x6 in — 2 strip per kertas 4x6 |
+  | Strip | 3 | 2x6 in — 2 strip per kertas 4x6 |
+  | Strip Keffiyeh | 3 | 2x6 in — 2 strip per kertas 4x6 |
 
-  Tiap jepretan dua tahap: **3 detik siap-siap** lalu **hitung mundur 3-2-1** + suara shutter + flash.
+  Frame = gambar desain di `public/frames/*.webp` dengan jendela foto transparan; foto diletakkan di
+  bawahnya. Tiap jepretan dua tahap: **3 detik siap-siap** lalu **hitung mundur 3-2-1** + suara shutter + flash.
   Kamera menampilkan **panduan bingkai** (area yang masuk ke foto). Setelah semua foto terambil ada layar
   review dengan **Retake per foto**. Filter: **Asli, Retro** (film pudar + halftone), **Hitam Putih**,
   **Cantik** (kulit dihaluskan & dicerahkan). Di layar hasil: **Foto Ulang** atau **Selesai**.
-  Durasi & teks siap-siap diatur di `config/event.ts`; gaya di `config/layouts.ts`, frame di `config/frames.ts`,
-  filter di `config/filters.ts` + `lib/imageFilters.ts`.
+  Durasi & teks siap-siap diatur di `config/event.ts`; gaya/frame di `config/layouts.ts`;
+  filter di `config/filters.ts` + `lib/imageFilters.ts`. Cara menambah frame: `public/frames/README.md`.
 - **Simpan: Perangkat / Google Drive** — muncul di layar hasil booth, halaman unduh tamu, dan galeri admin.
   - *Perangkat*: di HP membuka share sheet (bisa “Simpan Gambar” ke galeri), di laptop/kiosk jadi download.
   - *Google Drive*: login Google sekali, foto masuk ke folder `Photobooth - <nama event>`.
@@ -144,7 +147,7 @@ Workflow `.github/workflows/maintenance.yml` jalan tiap 3 hari; bisa juga dijala
 1. Buka situs di laptop/tablet kiosk (Chrome disarankan) → izinkan kamera.
 2. ⚙️ (pojok kanan atas layar awal): pilih kamera, **Sambungkan Google Drive** operator dan nyalakan
    *Auto-simpan* bila ingin backup semua foto, **Layar penuh**.
-3. Printer: ukuran kertas otomatis per gaya (6x8, 5x7, atau 4x6 untuk strip); pastikan printer punya kertas
+3. Printer: ukuran kertas otomatis per gaya (8x10, atau 4x6 untuk strip); pastikan printer punya kertas
    ukuran itu dan margin *None* di dialog print.
    Di Chrome kiosk bisa pakai flag `--kiosk-printing` agar langsung cetak tanpa dialog.
 4. Pantau kuota di `/admin`. Kalau storage > 80%, unduh ZIP / simpan ke Drive lalu hapus foto lama.
@@ -154,8 +157,7 @@ Workflow `.github/workflows/maintenance.yml` jalan tiap 3 hari; bisa juga dijala
 | File | Isi |
 |---|---|
 | `config/event.ts` | countdown, mirror kamera, auto-reset, suara, batas kuota & kompresi |
-| `config/layouts.ts` | gaya foto: ukuran, posisi slot, ukuran cetak |
-| `config/frames.ts` | frame per gaya (digambar via Canvas) |
+| `config/layouts.ts`, `public/frames/` | gaya foto: gambar frame, posisi jendela foto, ukuran cetak |
 | `config/filters.ts`, `lib/imageFilters.ts` | filter foto (per pixel) |
 | `app/globals.css` | warna aksen UI (`--accent`) |
 

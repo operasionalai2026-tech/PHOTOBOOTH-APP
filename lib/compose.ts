@@ -1,41 +1,45 @@
-// Menyusun foto akhir (full-res) dari jepretan + layout + frame + filter.
+// Menyusun foto akhir (full-res): warna dasar → foto per slot (+ filter) → gambar frame di atasnya.
 
 import type { Filter } from '@/config/filters';
-import type { Frame } from '@/config/frames';
-import type { Layout, Rect } from '@/config/layouts';
+import { LAYOUTS, type Layout } from '@/config/layouts';
 
 export type ComposeInput = {
   shots: HTMLCanvasElement[];
   layout: Layout;
-  frame: Frame;
   filter: Filter;
-  title: string;
-  tagline: string;
   /** Skala output; 1 = ukuran cetak penuh, <1 untuk preview cepat. */
   scale?: number;
 };
 
-const loadedFonts = new Set<string>();
+const artCache = new Map<string, Promise<HTMLImageElement>>();
 
-export async function ensureFonts(fonts: string[]) {
-  if (typeof document === 'undefined' || !document.fonts) return;
-  const pending = fonts.filter((f) => !loadedFonts.has(f));
-  if (!pending.length) return;
-  const all = Promise.all(
-    pending.map((f) =>
-      document.fonts
-        .load(f)
-        .then(() => loadedFonts.add(f))
-        .catch(() => undefined),
-    ),
-  );
-  // Jangan biarkan koneksi lambat/offline menahan booth: lewat 2,5 detik pakai font cadangan.
-  await Promise.race([all, new Promise((r) => setTimeout(r, 2500))]);
+/** Muat gambar frame (sekali, lalu disimpan di memori supaya tetap jalan saat offline). */
+export function loadArt(src: string): Promise<HTMLImageElement> {
+  let p = artCache.get(src);
+  if (!p) {
+    p = new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => resolve(img);
+      img.onerror = () => {
+        artCache.delete(src);
+        reject(new Error(`Gagal memuat frame ${src}`));
+      };
+      img.src = src;
+    });
+    artCache.set(src, p);
+  }
+  return p;
+}
+
+/** Muat semua frame di awal (booth dibuka) supaya siap walau koneksi putus di tengah acara. */
+export function preloadAllArt() {
+  LAYOUTS.forEach((l) => void loadArt(l.art.src).catch(() => undefined));
 }
 
 export async function composePhoto(input: ComposeInput): Promise<HTMLCanvasElement> {
-  const { shots, layout, frame, filter, title, tagline, scale = 1 } = input;
-  await ensureFonts(frame.fonts);
+  const { shots, layout, filter, scale = 1 } = input;
+  const art = await loadArt(layout.art.src);
 
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(layout.width * scale);
@@ -44,29 +48,18 @@ export async function composePhoto(input: ComposeInput): Promise<HTMLCanvasEleme
   ctx.scale(scale, scale);
   ctx.imageSmoothingQuality = 'high';
 
-  const fctx = { ctx, layout, title, tagline };
-  frame.background(fctx);
+  ctx.fillStyle = layout.paper;
+  ctx.fillRect(0, 0, layout.width, layout.height);
 
   layout.slots.forEach((slot, i) => {
     const shot = shots[i] ?? shots[shots.length - 1];
     if (!shot) return;
     const photo = renderSlotPhoto(shot, slot.w / slot.h, Math.round(slot.w * scale), Math.round(slot.h * scale), filter);
-    ctx.save();
-    roundRectPath(ctx, slot, frame.photoRadius);
-    ctx.clip();
     ctx.drawImage(photo, slot.x, slot.y, slot.w, slot.h);
-    ctx.restore();
-    if (frame.photoStroke) {
-      ctx.save();
-      ctx.strokeStyle = frame.photoStroke.color;
-      ctx.lineWidth = frame.photoStroke.width;
-      roundRectPath(ctx, slot, frame.photoRadius);
-      ctx.stroke();
-      ctx.restore();
-    }
   });
 
-  frame.overlay(fctx);
+  const a = layout.art;
+  ctx.drawImage(art, a.x, a.y, a.w, a.h);
   return canvas;
 }
 
@@ -94,15 +87,6 @@ export function canvasToBlob(canvas: HTMLCanvasElement, type = 'image/jpeg', qua
 }
 
 // ---------- internal ----------
-
-function roundRectPath(ctx: CanvasRenderingContext2D, r: Rect, radius: number) {
-  ctx.beginPath();
-  if (radius > 0 && typeof ctx.roundRect === 'function') {
-    ctx.roundRect(r.x, r.y, r.w, r.h, radius);
-  } else {
-    ctx.rect(r.x, r.y, r.w, r.h);
-  }
-}
 
 /**
  * Potong sumber sesuai rasio slot (object-fit: cover, di tengah), ubah ke ukuran target,
