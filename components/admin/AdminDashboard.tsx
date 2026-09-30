@@ -73,18 +73,24 @@ export function AdminDashboard({ session }: { session: Session }) {
   const chosen = photos.filter((p) => selected.has(p.id));
   const targets = chosen.length ? chosen : photos;
 
-  const fetchBlob = async (p: PhotoSession) => {
-    const res = await fetch(publicImageUrl(p.image_path));
-    if (!res.ok) throw new Error(`Gagal mengambil ${p.id}`);
+  const fetchBlob = async (path: string) => {
+    const res = await fetch(publicImageUrl(path));
+    if (!res.ok) throw new Error(`Gagal mengambil ${path}`);
     return res.blob();
   };
+
+  /** Semua file milik satu sesi: foto, plus GIF kalau ada. */
+  const filesOf = (p: PhotoSession) => [
+    { path: p.image_path, name: photoFileName(p.id, p.created_at) },
+    ...(p.gif_path ? [{ path: p.gif_path, name: photoFileName(p.id, p.created_at, 'gif') }] : []),
+  ];
 
   const downloadZip = async () => {
     const zip = new JSZip();
     setBulk({ label: 'Menyiapkan ZIP', done: 0, total: targets.length });
     try {
       for (const [i, p] of targets.entries()) {
-        zip.file(photoFileName(p.id, p.created_at), await fetchBlob(p));
+        for (const f of filesOf(p)) zip.file(f.name, await fetchBlob(f.path));
         setBulk({ label: 'Menyiapkan ZIP', done: i + 1, total: targets.length });
       }
       const blob = await zip.generateAsync({ type: 'blob' });
@@ -101,7 +107,7 @@ export function AdminDashboard({ session }: { session: Session }) {
       if (!isDriveConnected()) await connectDrive(); // popup login harus langsung dari klik
       setBulk({ label: 'Menyimpan ke Drive', done: 0, total: targets.length });
       for (const [i, p] of targets.entries()) {
-        await uploadToDrive(await fetchBlob(p), photoFileName(p.id, p.created_at), `Photobooth - ${p.event_slug}`);
+        for (const f of filesOf(p)) await uploadToDrive(await fetchBlob(f.path), f.name, `Photobooth - ${p.event_slug}`);
         setBulk({ label: 'Menyimpan ke Drive', done: i + 1, total: targets.length });
       }
       setMessage(`${targets.length} foto tersimpan di Google Drive.`);
@@ -116,7 +122,7 @@ export function AdminDashboard({ session }: { session: Session }) {
     if (!chosen.length) return;
     if (!confirm(`Hapus ${chosen.length} foto secara permanen? Link QR-nya akan mati.`)) return;
     setBulk({ label: 'Menghapus', done: 0, total: chosen.length });
-    const { error: stErr } = await sb.storage.from(STORAGE_BUCKET).remove(chosen.map((p) => p.image_path));
+    const { error: stErr } = await sb.storage.from(STORAGE_BUCKET).remove(chosen.flatMap((p) => filesOf(p).map((f) => f.path)));
     const { error: dbErr } = await sb.from('photo_sessions').delete().in('id', chosen.map((p) => p.id));
     setBulk(null);
     setMessage(stErr || dbErr ? `Gagal menghapus: ${(stErr || dbErr)!.message}` : `${chosen.length} foto dihapus.`);
@@ -247,34 +253,52 @@ export function AdminDashboard({ session }: { session: Session }) {
 }
 
 function PhotoCard({ photo, selected, onToggle }: { photo: PhotoSession; selected: boolean; onToggle: () => void }) {
-  const url = publicImageUrl(photo.image_path);
+  const [showGif, setShowGif] = useState(false);
+  const gif = showGif && photo.gif_path;
+  const url = publicImageUrl(gif ? photo.gif_path! : photo.image_path);
   const getBlob = useCallback(async () => (await fetch(url)).blob(), [url]);
   return (
     <div className={`overflow-hidden rounded-2xl bg-white/5 ring-1 transition ${selected ? 'ring-2 ring-accent' : 'ring-white/10'}`}>
-      <button type="button" onClick={onToggle} className="relative block w-full">
-        <img src={url} alt="" loading="lazy" className="aspect-[2/3] w-full bg-ink-800 object-cover" />
-        <span
-          className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full ring-2 ${
-            selected ? 'bg-accent ring-accent' : 'bg-black/40 ring-white/60'
-          }`}
-        >
-          {selected && <Icon name="check" className="h-4 w-4" />}
-        </span>
-        {photo.printed && (
-          <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold">
-            Dicetak
+      <div className="relative">
+        <button type="button" onClick={onToggle} className="relative block w-full">
+          <img src={url} alt="" loading="lazy" className="aspect-[2/3] w-full bg-ink-800 object-cover" />
+          <span
+            className={`absolute left-2 top-2 grid h-6 w-6 place-items-center rounded-full ring-2 ${
+              selected ? 'bg-accent ring-accent' : 'bg-black/40 ring-white/60'
+            }`}
+          >
+            {selected && <Icon name="check" className="h-4 w-4" />}
           </span>
+          {photo.printed && (
+            <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold">
+              Dicetak
+            </span>
+          )}
+        </button>
+        {photo.gif_path && (
+          <button
+            type="button"
+            onClick={() => setShowGif((v) => !v)}
+            aria-pressed={showGif}
+            title={showGif ? 'Lihat foto' : 'Lihat GIF'}
+            className={`absolute bottom-2 left-2 flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold ring-1 ${
+              showGif ? 'bg-white text-ink-900 ring-white' : 'bg-black/60 text-white ring-white/30'
+            }`}
+          >
+            <Icon name="burst" className="h-3.5 w-3.5" /> GIF
+          </button>
         )}
-      </button>
+      </div>
       <div className="p-2">
         <div className="mb-2 flex items-center justify-between text-[11px] text-white/50">
           <span>{new Date(photo.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })}</span>
           <span>{formatBytes(photo.size_bytes ?? 0)}</span>
         </div>
         <SaveOptions
+          key={gif ? 'gif' : 'photo'}
           compact
           getBlob={getBlob}
-          fileName={photoFileName(photo.id, photo.created_at)}
+          fileName={photoFileName(photo.id, photo.created_at, gif ? 'gif' : 'jpg')}
           driveFolder={`Photobooth - ${photo.event_slug}`}
         />
       </div>

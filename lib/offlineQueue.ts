@@ -7,6 +7,8 @@ import { uploadPhoto, UploadError, type NewPhotoSession } from './supabase';
 export type QueueItem = {
   id: string;
   blob: Blob;
+  /** GIF kolase berputar (mode GIF). */
+  gif?: Blob;
   meta: NewPhotoSession;
   createdAt: number;
   attempts: number;
@@ -52,8 +54,8 @@ function tx<T>(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => IDBReque
   );
 }
 
-export async function enqueue(blob: Blob, meta: NewPhotoSession): Promise<void> {
-  const item: QueueItem = { id: meta.id, blob, meta, createdAt: Date.now(), attempts: 0, nextAttemptAt: 0 };
+export async function enqueue(blob: Blob, meta: NewPhotoSession, gif?: Blob): Promise<void> {
+  const item: QueueItem = { id: meta.id, blob, gif, meta, createdAt: Date.now(), attempts: 0, nextAttemptAt: 0 };
   await tx('readwrite', (s) => s.put(item));
   emit();
 }
@@ -112,7 +114,7 @@ export async function processQueue(force = false): Promise<void> {
     for (const item of items) {
       if (!force && item.nextAttemptAt > Date.now()) continue;
       try {
-        await uploadPhoto(item.blob, { ...item.meta, size_bytes: item.blob.size });
+        await uploadPhoto(item.blob, { ...item.meta, size_bytes: item.blob.size }, item.gif);
         await remove(item.id);
         emit({ type: 'uploaded', id: item.id });
       } catch (err) {

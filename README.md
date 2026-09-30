@@ -32,6 +32,12 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
   **Cantik** (kulit dihaluskan & dicerahkan). Di layar hasil: **Foto Ulang** atau **Selesai**.
   Durasi & teks siap-siap diatur di `config/event.ts`; gaya/frame di `config/layouts.ts`;
   filter di `config/filters.ts` + `lib/imageFilters.ts`. Cara menambah frame: `public/frames/README.md`.
+- **Mode GIF** (gaya dengan lebih dari 1 foto, pilih **Foto / GIF** di layar kamera): sekali siap-siap + 3-2-1,
+  lalu kamera **jepret beruntun tiap ±1,5 detik** sambil tamu ganti gaya. Hasilnya foto cetak biasa **plus GIF
+  “kolase berputar”**: desain frame tetap, foto berpindah jendela tiap frame GIF sehingga tiap jendela jadi
+  animasi kecil. GIF (±490 px lebar untuk 8x10, maks. 900 KB) ikut diunggah, bisa disimpan ke Perangkat/Drive,
+  dan muncul di halaman unduh tamu (tab Foto / GIF). Jeda & kecepatan animasi: `gifIntervalMs` / `gifFrameMs`
+  di `config/event.ts`. Encoder: [gifenc](https://github.com/mattdesl/gifenc) (MIT).
 - **Simpan: Perangkat / Google Drive** — muncul di layar hasil booth, halaman unduh tamu, dan galeri admin.
   - *Perangkat*: di HP membuka share sheet (bisa “Simpan Gambar” ke galeri), di laptop/kiosk jadi download.
   - *Google Drive*: login Google sekali, foto masuk ke folder `Photobooth - <nama event>`.
@@ -62,7 +68,8 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
 1. Buat project di [supabase.com](https://supabase.com) (Free).
 2. Jalankan seluruh isi `supabase/schema.sql` di **SQL Editor**. Ini membuat tabel `photo_sessions` + RLS,
    tabel `booth_events` (daftar event yang boleh upload), fungsi `mark_printed`, bucket `photos`
-   (public, 1 MB, JPEG), dan policy storage.
+   (public, 1 MB, JPEG + GIF), dan policy storage. File ini aman dijalankan ulang — **project lama (sebelum
+   ada mode GIF) cukup jalankan ulang sekali** supaya kolom `gif_path` dan izin upload GIF ditambahkan.
    Lalu daftarkan slug event kamu (sama dengan `NEXT_PUBLIC_EVENT_SLUG`):
    ```sql
    insert into booth_events (slug) values ('nama-event') on conflict do nothing;

@@ -6,20 +6,25 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { EVENT, PREPARE_TEXT } from '@/config/event';
 import { captureFrame, cameraErrorMessage, startCamera, stopCamera, type CameraError } from '@/lib/camera';
+import { supportsGif } from '@/lib/gif';
 import { playBeep, playShutter } from '@/lib/sound';
 import { useSticky } from '@/lib/useSticky';
-import { useBooth } from '@/lib/store';
+import { useBooth, type CaptureMode } from '@/lib/store';
 import { StepDots } from './LayoutPicker';
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * idle      → tombol "Jepret!"
+ * idle      → pilih mode Foto/GIF + tombol "Jepret!"
  * prepare   → tahap 1: "siap-siap" (EVENT.prepareSeconds)
  * countdown → tahap 2: hitung mundur 3-2-1 lalu jepret
+ * burst     → mode GIF: jeda singkat antar jepretan beruntun (EVENT.gifIntervalMs), tamu ganti gaya
  * review    → semua foto terambil; Retake per foto atau Lanjut
+ *
+ * Mode Foto: siap-siap → 3-2-1 → jepret, diulang untuk tiap foto.
+ * Mode GIF:  siap-siap → 3-2-1 → jepret, lalu jepret lagi tiap ±1,5 detik sampai semua jendela terisi.
  */
-type Phase = 'idle' | 'prepare' | 'countdown' | 'review';
+type Phase = 'idle' | 'prepare' | 'countdown' | 'burst' | 'review';
 
 type Slot<T> = (T | null)[];
 
@@ -35,8 +40,12 @@ export function CaptureScreen() {
   const go = useBooth((s) => s.go);
   const cameraId = useBooth((s) => s.settings.cameraId);
   const soundOn = useBooth((s) => s.settings.sound);
+  const captureMode = useBooth((s) => s.captureMode);
+  const setCaptureMode = useBooth((s) => s.setCaptureMode);
 
   const total = layout.slots.length;
+  const canGif = supportsGif(layout);
+  const gifMode = canGif && captureMode === 'gif';
   const slotAspect = layout.slots[0].w / layout.slots[0].h;
 
   // Kembali dari layar Hias ("Ubah foto") → langsung ke review dengan foto yang sudah ada.
@@ -61,7 +70,7 @@ export function CaptureScreen() {
   const [flash, setFlash] = useState(0);
   const [thumbs, setThumbs] = useState<Slot<string>>(() => (initial ? initial.map(thumbnail) : Array(total).fill(null)));
 
-  const busy = phase === 'prepare' || phase === 'countdown';
+  const busy = phase === 'prepare' || phase === 'countdown' || phase === 'burst';
   const takenCount = thumbs.filter(Boolean).length;
 
   const openCamera = useCallback(async () => {
@@ -87,10 +96,8 @@ export function CaptureScreen() {
     };
   }, [openCamera]);
 
-  /** Satu jepretan: siap-siap → 3-2-1 → jepret. Return false kalau dibatalkan (layar ditinggal). */
-  const shootOne = async (index: number, message: string): Promise<boolean> => {
-    const video = videoRef.current;
-    if (!video) return false;
+  /** Tahap siap-siap lalu hitung mundur 3-2-1. Return false kalau dibatalkan (layar ditinggal). */
+  const getReady = async (index: number, message: string): Promise<boolean> => {
     setActive(index);
 
     // Tahap 1: siap-siap
@@ -111,15 +118,39 @@ export function CaptureScreen() {
       if (soundOn) playBeep(n === 1);
       await wait(1000);
     }
-    if (cancelled.current) return false;
+    return !cancelled.current;
+  };
 
+  /** Ambil gambar dari kamera untuk jendela ke-`index` (dengan flash & suara shutter). */
+  const snap = (index: number): boolean => {
+    const video = videoRef.current;
+    if (!video || cancelled.current) return false;
     setCount(null);
     if (soundOn) playShutter();
     setFlash((f) => f + 1);
     const shot = captureFrame(video, EVENT.mirror);
     shotsRef.current = replaceAt(shotsRef.current, index, shot);
     setThumbs((t) => replaceAt(t, index, thumbnail(shot)));
+    return true;
+  };
+
+  /** Satu jepretan lengkap: siap-siap → 3-2-1 → jepret. */
+  const shootOne = async (index: number, message: string): Promise<boolean> => {
+    if (!(await getReady(index, message)) || !snap(index)) return false;
     await wait(700); // beri waktu flash & thumbnail muncul
+    return !cancelled.current;
+  };
+
+  /** Mode GIF: sekali siap-siap + 3-2-1, lalu jepret beruntun tiap EVENT.gifIntervalMs. */
+  const shootBurst = async (): Promise<boolean> => {
+    if (!(await getReady(0, PREPARE_TEXT.gif(total))) || !snap(0)) return false;
+    for (let i = 1; i < total; i++) {
+      setActive(i);
+      setPhase('burst');
+      await wait(EVENT.gifIntervalMs);
+      if (!snap(i)) return false;
+    }
+    await wait(700);
     return !cancelled.current;
   };
 
@@ -127,9 +158,13 @@ export function CaptureScreen() {
     if (busy || !ready) return;
     shotsRef.current = Array(total).fill(null);
     setThumbs(Array(total).fill(null));
-    for (let i = 0; i < total; i++) {
-      const message = i === 0 ? PREPARE_TEXT.first(EVENT.prepareSeconds) : PREPARE_TEXT.next(i + 1, total);
-      if (!(await shootOne(i, message))) return;
+    if (gifMode) {
+      if (!(await shootBurst())) return;
+    } else {
+      for (let i = 0; i < total; i++) {
+        const message = i === 0 ? PREPARE_TEXT.first(EVENT.prepareSeconds) : PREPARE_TEXT.next(i + 1, total);
+        if (!(await shootOne(i, message))) return;
+      }
     }
     setActive(null);
     setPhase('review');
@@ -237,6 +272,41 @@ export function CaptureScreen() {
             )}
           </AnimatePresence>
 
+          {/* Mode GIF: jeda singkat antar jepretan beruntun */}
+          <AnimatePresence>
+            {phase === 'burst' && active !== null && (
+              <motion.div
+                key={`burst-${active}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="pointer-events-none absolute inset-0"
+              >
+                <motion.div
+                  initial={{ scale: 0.7, y: -10 }}
+                  animate={{ scale: 1, y: 0 }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 16 }}
+                  className="absolute inset-x-0 top-6 flex flex-col items-center text-center"
+                >
+                  <span className="rounded-3xl bg-black/55 px-6 py-3 font-display text-4xl font-semibold text-amber-300 backdrop-blur sm:text-6xl">
+                    {PREPARE_TEXT.burst}
+                  </span>
+                  <span className="mt-2 rounded-full bg-black/55 px-4 py-1 text-sm font-medium text-white backdrop-blur">
+                    GIF · foto {active + 1} dari {total}
+                  </span>
+                </motion.div>
+                <div className="absolute inset-x-10 bottom-8 h-2.5 overflow-hidden rounded-full bg-white/25">
+                  <motion.div
+                    initial={{ width: '0%' }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: EVENT.gifIntervalMs / 1000, ease: 'linear' }}
+                    className="h-full rounded-full bg-amber-300"
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Flash */}
           <AnimatePresence>
             {flash > 0 && (
@@ -267,18 +337,28 @@ export function CaptureScreen() {
           )}
 
           {/* Pill jepretan ke-berapa */}
-          {busy && active !== null && total > 1 && (
+          {(phase === 'prepare' || phase === 'countdown') && active !== null && total > 1 && (
             <div className="absolute left-1/2 top-5 -translate-x-1/2 rounded-full bg-black/55 px-4 py-1.5 text-sm font-medium backdrop-blur">
-              Foto {active + 1} dari {total}
+              {gifMode && phase !== 'prepare' ? 'GIF · ' : ''}Foto {active + 1} dari {total}
             </div>
           )}
 
           {/* Tombol mulai */}
           {ready && phase === 'idle' && (
             <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 bg-gradient-to-t from-black/75 to-transparent px-4 pb-8 pt-24 text-center">
-              <p className="text-white/85">
-                {total > 1 ? `${total} foto · ` : ''}tiap foto: {EVENT.prepareSeconds} detik siap-siap, lalu hitung mundur{' '}
-                {EVENT.countdownSeconds} detik
+              {canGif && <ModeSwitch value={captureMode} onChange={setCaptureMode} />}
+              <p className="max-w-xl text-white/85">
+                {gifMode ? (
+                  <>
+                    {total} foto beruntun tiap {(EVENT.gifIntervalMs / 1000).toLocaleString('id-ID')} detik, ganti gaya tiap
+                    jepret! Hasilnya foto + GIF.
+                  </>
+                ) : (
+                  <>
+                    {total > 1 ? `${total} foto · ` : ''}tiap foto: {EVENT.prepareSeconds} detik siap-siap, lalu hitung mundur{' '}
+                    {EVENT.countdownSeconds} detik
+                  </>
+                )}
               </p>
               <Button size="xl" onClick={runAll}>
                 <Icon name="camera" className="h-7 w-7" /> Jepret!
@@ -353,6 +433,35 @@ export function CaptureScreen() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Pilihan mode: Foto (jepret satu-satu) atau GIF (jepret beruntun). */
+function ModeSwitch({ value, onChange }: { value: CaptureMode; onChange: (m: CaptureMode) => void }) {
+  const options: { id: CaptureMode; label: string; icon: 'camera' | 'burst' }[] = [
+    { id: 'photo', label: 'Foto', icon: 'camera' },
+    { id: 'gif', label: 'GIF', icon: 'burst' },
+  ];
+  return (
+    <div role="radiogroup" aria-label="Mode foto" className="flex rounded-2xl bg-black/55 p-1 ring-1 ring-white/15 backdrop-blur">
+      {options.map((o) => {
+        const on = value === o.id;
+        return (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(o.id)}
+            className={`flex h-11 items-center gap-2 rounded-xl px-5 text-base font-semibold transition ${
+              on ? 'bg-white text-ink-900' : 'text-white/75 hover:text-white'
+            }`}
+          >
+            <Icon name={o.icon} className="h-5 w-5" /> {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

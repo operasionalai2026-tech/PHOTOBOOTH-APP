@@ -148,7 +148,7 @@ async function getToken(): Promise<string> {
 
 // ---------- Drive API ----------
 
-const folderCache = new Map<string, string>();
+const folderCache = new Map<string, Promise<string>>();
 
 async function driveFetch(url: string, init: RequestInit = {}, retried = false): Promise<Response> {
   const token = await getToken();
@@ -173,10 +173,21 @@ async function driveFetch(url: string, init: RequestInit = {}, retried = false):
   return res;
 }
 
-/** Cari (atau buat) folder milik aplikasi di root Drive. */
-export async function ensureFolder(name: string): Promise<string> {
-  const cached = folderCache.get(name);
-  if (cached) return cached;
+/**
+ * Cari (atau buat) folder milik aplikasi di root Drive. Promise-nya disimpan supaya dua upload
+ * bersamaan (mis. foto + GIF) tidak membuat dua folder dengan nama sama.
+ */
+export function ensureFolder(name: string): Promise<string> {
+  let p = folderCache.get(name);
+  if (!p) {
+    p = findOrCreateFolder(name);
+    p.catch(() => folderCache.delete(name));
+    folderCache.set(name, p);
+  }
+  return p;
+}
+
+async function findOrCreateFolder(name: string): Promise<string> {
   const q = [
     `name = '${name.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`,
     `mimeType = 'application/vnd.google-apps.folder'`,
@@ -194,7 +205,6 @@ export async function ensureFolder(name: string): Promise<string> {
     }).then((r) => r.json() as Promise<{ id: string }>);
     id = created.id;
   }
-  folderCache.set(name, id);
   return id;
 }
 

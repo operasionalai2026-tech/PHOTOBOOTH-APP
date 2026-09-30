@@ -22,7 +22,10 @@ export default function PrivacyPage() {
 
         <Section title="Data yang kami simpan">
           <ul className="list-disc space-y-1 pl-5">
-            <li>Foto hasil photobooth (versi terkompresi, maks. ±500 KB) beserta pilihan layout, frame, dan filter.</li>
+            <li>
+              Foto hasil photobooth (versi terkompresi, maks. ±500 KB) dan GIF kalau memakai mode GIF, beserta pilihan
+              layout, frame, dan filter.
+            </li>
             <li>Waktu foto diambil dan apakah foto sudah dicetak.</li>
           </ul>
           <p>

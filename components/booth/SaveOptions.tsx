@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import {
@@ -168,19 +168,16 @@ function SaveButton({
       </div>
       <div className="mt-3">
         <div className="text-[15px] font-semibold leading-tight">{label}</div>
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={state.message || hint}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            className={`mt-0.5 line-clamp-2 text-xs ${
-              done ? 'text-emerald-200' : error ? 'text-red-200' : 'text-white/55'
-            }`}
-          >
-            {done && state.link ? `${state.message} · Buka` : state.message || hint}
-          </motion.div>
-        </AnimatePresence>
+        {/* Tanpa animasi keluar: status bisa berganti cepat (Masuk Google → Mengunggah → Tersimpan) dan
+            AnimatePresence mode="wait" kadang tertahan di teks lama. */}
+        <motion.div
+          key={state.message || hint}
+          initial={state.status === 'idle' ? false : { opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`mt-0.5 line-clamp-2 text-xs ${done ? 'text-emerald-200' : error ? 'text-red-200' : 'text-white/55'}`}
+        >
+          {done && state.link ? `${state.message} · Buka` : state.message || hint}
+        </motion.div>
       </div>
     </motion.button>
   );

@@ -5,6 +5,7 @@
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useState } from 'react';
+import { ViewTabs } from '@/components/booth/ViewTabs';
 import { SaveOptions, Spinner } from '@/components/booth/SaveOptions';
 import { Backdrop } from '@/components/ui/Backdrop';
 import { Icon } from '@/components/ui/Icon';
@@ -113,35 +114,56 @@ function Ready({ row, url }: { row: PhotoSession; url: string }) {
   const expires = new Date(new Date(row.created_at).getTime() + LIMITS.retentionDays * 86_400_000);
   const daysLeft = Math.max(0, Math.ceil((expires.getTime() - Date.now()) / 86_400_000));
 
+  const gifUrl = row.gif_path ? publicImageUrl(row.gif_path) : null;
+  const [view, setView] = useState<'photo' | 'gif'>(gifUrl ? 'gif' : 'photo');
+  const showGif = view === 'gif' && gifUrl;
+  const current = showGif ? gifUrl : url;
+
   const getBlob = useCallback(async () => {
-    const res = await fetch(url, { cache: 'force-cache' });
+    const res = await fetch(current, { cache: 'force-cache' });
     if (!res.ok) throw new Error('Gagal mengambil foto');
     return res.blob();
-  }, [url]);
+  }, [current]);
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center">
       <p className="text-xs font-medium uppercase tracking-[0.35em] text-accent-soft">Photobooth</p>
       <h1 className="mt-2 text-center font-display text-4xl font-semibold">{EVENT.name}</h1>
 
+      {gifUrl && (
+        <div className="mt-5">
+          <ViewTabs value={view} onChange={setView} />
+        </div>
+      )}
+
       <motion.img
+        key={current}
         initial={{ opacity: 0, y: 20, rotate: -2 }}
         animate={{ opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 120, damping: 16 }}
-        src={url}
-        alt="Foto photobooth kamu"
-        className="mt-6 w-full rounded-xl shadow-2xl shadow-black/70"
+        src={current}
+        alt={showGif ? 'GIF photobooth kamu' : 'Foto photobooth kamu'}
+        className={`${gifUrl ? 'mt-4' : 'mt-6'} max-h-[78dvh] w-auto max-w-full rounded-xl object-contain shadow-2xl shadow-black/70`}
       />
 
       <div className="mt-6 w-full">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-white/50">Simpan ke</h2>
-        <SaveOptions getBlob={getBlob} fileName={photoFileName(row.id, row.created_at)} driveFolder={`Photobooth - ${EVENT.name}`} />
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-widest text-white/50">
+          {gifUrl ? (showGif ? 'Simpan GIF ke' : 'Simpan foto ke') : 'Simpan ke'}
+        </h2>
+        <SaveOptions
+          key={view}
+          getBlob={getBlob}
+          fileName={photoFileName(row.id, row.created_at, showGif ? 'gif' : 'jpg')}
+          driveFolder={`Photobooth - ${EVENT.name}`}
+        />
       </div>
 
       <div className="mt-5 flex w-full items-start gap-3 rounded-2xl bg-amber-400/10 p-4 text-sm text-amber-100 ring-1 ring-amber-300/25">
         <Icon name="cloud" className="mt-0.5 h-5 w-5 shrink-0" />
         <div>
-          <div className="font-semibold">Foto tersedia {LIMITS.retentionDays} hari</div>
+          <div className="font-semibold">
+            {gifUrl ? 'Foto & GIF' : 'Foto'} tersedia {LIMITS.retentionDays} hari
+          </div>
           <div className="text-amber-100/70">
             Sisa {daysLeft} hari (sampai{' '}
             {expires.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}). Simpan sekarang

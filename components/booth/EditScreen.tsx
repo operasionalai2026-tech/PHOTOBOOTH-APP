@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { FILTERS, getFilter } from '@/config/filters';
 import { canvasToBlob, composePhoto, filterThumbnail } from '@/lib/compose';
+import { makeCarouselGif, supportsGif } from '@/lib/gif';
 import { useSticky } from '@/lib/useSticky';
 import { useBooth } from '@/lib/store';
 import { uuid } from '@/lib/uuid';
 import { StepDots } from './LayoutPicker';
+import { ViewTabs } from './ViewTabs';
 import { Spinner } from './SaveOptions';
 
 export function EditScreen() {
@@ -19,10 +21,28 @@ export function EditScreen() {
   const setFilter = useBooth((s) => s.setFilter);
   const setResult = useBooth((s) => s.setResult);
   const go = useBooth((s) => s.go);
+  const gifMode = useBooth((s) => s.captureMode) === 'gif' && supportsGif(layout);
 
   const [preview, setPreview] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [view, setView] = useState<'photo' | 'gif'>(gifMode ? 'gif' : 'photo');
+  const [gifPreview, setGifPreview] = useState<{ filterId: string; url: string } | null>(null);
   const renderId = useRef(0);
+  const gifPreviewUrl = useRef<string | null>(null);
+
+  // GIF per filter, dibuat sekali lalu dipakai ulang untuk preview & hasil akhir.
+  const getGif = useMemo(() => {
+    const cache = new Map<string, Promise<Blob>>();
+    return (id: string) => {
+      let p = cache.get(id);
+      if (!p) {
+        p = makeCarouselGif({ shots, layout, filter: getFilter(id) });
+        p.catch(() => cache.delete(id));
+        cache.set(id, p);
+      }
+      return p;
+    };
+  }, [shots, layout]);
 
   // Preview cepat (skala kecil); dirender ulang setiap frame/filter berubah.
   useEffect(() => {
@@ -38,6 +58,33 @@ export function EditScreen() {
     }, 40);
     return () => clearTimeout(t);
   }, [shots, layout, filterId]);
+
+  // Preview GIF (animasi asli, sama persis dengan file yang disimpan) untuk filter yang dipilih.
+  useEffect(() => {
+    if (!gifMode || view !== 'gif') return;
+    let alive = true;
+    const t = setTimeout(() => {
+      getGif(filterId)
+        .then((blob) => {
+          if (!alive) return;
+          if (gifPreviewUrl.current) URL.revokeObjectURL(gifPreviewUrl.current);
+          const url = (gifPreviewUrl.current = URL.createObjectURL(blob));
+          setGifPreview({ filterId, url });
+        })
+        .catch(() => undefined);
+    }, 60);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [gifMode, view, filterId, getGif]);
+
+  useEffect(
+    () => () => {
+      if (gifPreviewUrl.current) URL.revokeObjectURL(gifPreviewUrl.current);
+    },
+    [],
+  );
 
   // Thumbnail tiap filter dirender dengan filter sungguhan dari foto pertama.
   const filterThumbs = useMemo(() => {
@@ -55,10 +102,13 @@ export function EditScreen() {
         filter: getFilter(filterId),
       });
       const fullBlob = await canvasToBlob(full, 'image/jpeg', 0.95);
+      const gifBlob = gifMode ? await getGif(filterId).catch(() => undefined) : undefined;
       setResult({
         id: uuid(),
         fullBlob,
         fullUrl: URL.createObjectURL(fullBlob),
+        gifBlob,
+        gifUrl: gifBlob ? URL.createObjectURL(gifBlob) : undefined,
         createdAt: new Date().toISOString(),
       });
     } catch {
@@ -81,8 +131,23 @@ export function EditScreen() {
 
       <div className="mt-4 grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr_380px]">
         {/* Preview */}
-        <div className="flex min-h-0 items-center justify-center">
-          {preview ? (
+        <div className="relative flex min-h-0 flex-col items-center justify-center gap-3">
+          {gifMode && <ViewTabs value={view} onChange={setView} />}
+          {view === 'gif' ? (
+            gifPreview?.filterId === filterId ? (
+              <img
+                src={gifPreview.url}
+                alt="Preview GIF"
+                className="max-h-full max-w-full rounded-lg object-contain shadow-2xl shadow-black/60"
+                style={{ maxHeight: 'calc(100dvh - 230px)' }}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-white/60">
+                <Spinner className="h-10 w-10 text-white/50" />
+                Membuat GIF…
+              </div>
+            )
+          ) : preview ? (
             <motion.img
               key={preview.length}
               initial={{ opacity: 0.6 }}
@@ -90,7 +155,7 @@ export function EditScreen() {
               src={preview}
               alt="Preview foto"
               className="max-h-full max-w-full rounded-lg object-contain shadow-2xl shadow-black/60"
-              style={{ maxHeight: 'calc(100dvh - 180px)' }}
+              style={{ maxHeight: gifMode ? 'calc(100dvh - 230px)' : 'calc(100dvh - 180px)' }}
             />
           ) : (
             <Spinner className="h-10 w-10 text-white/50" />
@@ -107,6 +172,11 @@ export function EditScreen() {
                 {layout.description} · {layout.sizeLabel}
               </span>
             </div>
+            {gifMode && (
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-200/90">
+                <Icon name="burst" className="h-4 w-4" /> Mode GIF: hasil berupa foto cetak + GIF kolase berputar
+              </div>
+            )}
           </div>
 
           <section>

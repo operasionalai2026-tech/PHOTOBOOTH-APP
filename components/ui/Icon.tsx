@@ -17,7 +17,8 @@ type IconName =
   | 'external'
   | 'trash'
   | 'zip'
-  | 'phone';
+  | 'phone'
+  | 'burst';
 
 const paths: Record<IconName, JSX.Element> = {
   camera: (
@@ -70,6 +71,13 @@ const paths: Record<IconName, JSX.Element> = {
     <>
       <rect x="7" y="2.5" width="10" height="19" rx="2" />
       <path d="M11 18h2" />
+    </>
+  ),
+  burst: (
+    <>
+      <rect x="7" y="7" width="13" height="13" rx="2" />
+      <path d="M4 16V5a1 1 0 0 1 1-1h11" />
+      <path d="m12 11 4 2.5-4 2.5Z" />
     </>
   ),
 };

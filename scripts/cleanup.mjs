@@ -46,7 +46,7 @@ let lastId = null;
 
 for (;;) {
   const params = new URLSearchParams({
-    select: 'id,image_path,size_bytes',
+    select: 'id,image_path,gif_path,size_bytes',
     created_at: `lt.${cutoff}`,
     order: 'id.asc',
     limit: String(BATCH),
@@ -57,7 +57,7 @@ for (;;) {
   if (!rows.length) break;
   lastId = rows[rows.length - 1].id;
 
-  const paths = rows.map((r) => r.image_path).filter(Boolean);
+  const paths = rows.flatMap((r) => [r.image_path, r.gif_path]).filter(Boolean);
   const bytes = rows.reduce((s, r) => s + (r.size_bytes || 0), 0);
 
   if (!dryRun) {

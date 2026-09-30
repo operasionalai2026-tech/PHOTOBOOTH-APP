@@ -27,6 +27,9 @@ export type PhotoSession = {
   frame: string | null;
   filter: string | null;
   image_path: string;
+  /** GIF kolase berputar (mode GIF); null untuk foto biasa. */
+  gif_path: string | null;
+  /** Total ukuran file di storage (foto + GIF). */
   size_bytes: number | null;
   printed: boolean;
   created_at: string;
@@ -36,8 +39,8 @@ export type NewPhotoSession = Pick<PhotoSession, 'id' | 'layout' | 'frame' | 'fi
   printed?: boolean;
 };
 
-export function imagePathFor(id: string, eventSlug = EVENT.slug) {
-  return `${eventSlug}/${id}.jpg`;
+export function imagePathFor(id: string, eventSlug = EVENT.slug, ext: 'jpg' | 'gif' = 'jpg') {
+  return `${eventSlug}/${id}.${ext}`;
 }
 
 export function publicImageUrl(path: string): string {
@@ -55,20 +58,29 @@ export class UploadError extends Error {
   }
 }
 
-/** Upload foto terkompresi lalu catat barisnya di photo_sessions. Idempoten per id. */
-export async function uploadPhoto(blob: Blob, meta: NewPhotoSession): Promise<PhotoSession> {
+/**
+ * Upload foto terkompresi (+ GIF kalau ada) lalu catat barisnya di photo_sessions. Idempoten per id.
+ * GIF bersifat tambahan: kalau project Supabase belum mengizinkan GIF (schema.sql lama), foto tetap terunggah.
+ */
+export async function uploadPhoto(blob: Blob, meta: NewPhotoSession, gif?: Blob | null): Promise<PhotoSession> {
   const sb = getSupabase();
   if (!sb) throw new UploadError('Supabase belum dikonfigurasi', 'config');
   if (typeof navigator !== 'undefined' && !navigator.onLine) throw new UploadError('Offline', 'offline');
 
   const path = imagePathFor(meta.id);
-  const { error: upErr } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, {
-    contentType: 'image/jpeg',
-    cacheControl: '31536000',
-    upsert: false,
-  });
-  // Retry setelah upload sukses tapi insert gagal → file sudah ada, lanjut insert.
-  if (upErr && !isDuplicate(upErr)) throw classify(upErr);
+  await uploadFile(sb, path, blob, 'image/jpeg');
+
+  let gifPath: string | null = null;
+  if (gif) {
+    gifPath = imagePathFor(meta.id, EVENT.slug, 'gif');
+    try {
+      await uploadFile(sb, gifPath, gif, 'image/gif');
+    } catch (e) {
+      if (!(e instanceof GifNotAllowed)) throw e;
+      console.warn('GIF tidak diunggah (bucket/policy belum mengizinkan GIF — jalankan ulang supabase/schema.sql).', e);
+      gifPath = null;
+    }
+  }
 
   const row = {
     id: meta.id,
@@ -77,13 +89,36 @@ export async function uploadPhoto(blob: Blob, meta: NewPhotoSession): Promise<Ph
     frame: meta.frame,
     filter: meta.filter,
     image_path: path,
-    size_bytes: meta.size_bytes,
+    size_bytes: blob.size + (gifPath && gif ? gif.size : 0),
     printed: meta.printed ?? false,
+    ...(gifPath ? { gif_path: gifPath } : {}),
   };
-  const { error: insErr } = await sb.from('photo_sessions').insert(row);
+  let { error: insErr } = await sb.from('photo_sessions').insert(row);
+  // Kolom gif_path belum ada (schema lama) → simpan fotonya saja.
+  if (insErr && gifPath && (insErr.code === 'PGRST204' || /gif_path/.test(insErr.message))) {
+    const { gif_path: _unused, ...withoutGif } = row as typeof row & { gif_path?: string };
+    ({ error: insErr } = await sb.from('photo_sessions').insert(withoutGif));
+  }
   if (insErr && insErr.code !== '23505') throw classify(insErr);
 
-  return { ...row, created_at: new Date().toISOString() } as PhotoSession;
+  return { gif_path: null, ...row, created_at: new Date().toISOString() } as PhotoSession;
+}
+
+class GifNotAllowed extends Error {}
+
+async function uploadFile(sb: SupabaseClient, path: string, blob: Blob, contentType: string) {
+  const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, blob, {
+    contentType,
+    cacheControl: '31536000',
+    upsert: false,
+  });
+  // Retry setelah upload sukses tapi insert gagal → file sudah ada, lanjut.
+  if (!error || isDuplicate(error)) return;
+  const msg = (error.message || '').toLowerCase();
+  if (contentType === 'image/gif' && (msg.includes('mime') || msg.includes('row-level security') || msg.includes('policy'))) {
+    throw new GifNotAllowed(error.message);
+  }
+  throw classify(error);
 }
 
 export async function markPrinted(id: string) {

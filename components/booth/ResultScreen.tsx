@@ -13,6 +13,7 @@ import { photoFileName } from '@/lib/saveDevice';
 import { useBooth, type UploadStatus } from '@/lib/store';
 import { useSticky } from '@/lib/useSticky';
 import { isSupabaseConfigured, markPrinted } from '@/lib/supabase';
+import { ViewTabs } from './ViewTabs';
 import { StepDots } from './LayoutPicker';
 import { PrintArea, printImage, type PrintJob } from './PrintArea';
 import { SaveOptions, Spinner } from './SaveOptions';
@@ -32,7 +33,9 @@ export function ResultScreen() {
   const [printing, setPrinting] = useState(false);
   const [printJob, setPrintJob] = useState<PrintJob | null>(null);
   const [idleLeft, setIdleLeft] = useState<number | null>(null);
+  const [view, setView] = useState<'photo' | 'gif'>(result.gifUrl ? 'gif' : 'photo');
   const started = useRef(false);
+  const hasGif = Boolean(result.gifBlob && result.gifUrl);
 
   const url = downloadUrl(result.id);
 
@@ -54,13 +57,17 @@ export function ResultScreen() {
     (async () => {
       try {
         const small = await compressForUpload(result.fullBlob);
-        await enqueue(small, {
-          id: result.id,
-          layout: layout.id,
-          frame: layout.id,
-          filter: getFilter(filterId).id,
-          size_bytes: small.size,
-        });
+        await enqueue(
+          small,
+          {
+            id: result.id,
+            layout: layout.id,
+            frame: layout.id,
+            filter: getFilter(filterId).id,
+            size_bytes: small.size,
+          },
+          result.gifBlob,
+        );
         if (!isSupabaseConfigured) return setUpload('disabled');
         // Offline: foto aman di IndexedDB, startAutoRetry() mengunggahnya saat online lagi.
         if (!navigator.onLine) return setUpload('offline');
@@ -98,6 +105,7 @@ export function ResultScreen() {
   }, [reset]);
 
   const getBlob = useCallback(async () => result.fullBlob, [result]);
+  const getGif = useCallback(async () => result.gifBlob!, [result]);
 
   const print = async () => {
     setPrinting(true);
@@ -125,13 +133,14 @@ export function ResultScreen() {
           initial={{ rotate: -3, y: 40, opacity: 0 }}
           animate={{ rotate: 0, y: 0, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 120, damping: 16 }}
-          className="flex min-h-0 items-center justify-center"
+          className="flex min-h-0 flex-col items-center justify-center gap-3"
         >
+          {hasGif && <ViewTabs value={view} onChange={setView} />}
           <img
-            src={result.fullUrl}
-            alt="Hasil foto"
+            src={view === 'gif' && hasGif ? result.gifUrl : result.fullUrl}
+            alt={view === 'gif' && hasGif ? 'Hasil GIF' : 'Hasil foto'}
             className="max-w-full rounded-lg object-contain shadow-2xl shadow-black/70"
-            style={{ maxHeight: 'calc(100dvh - 150px)' }}
+            style={{ maxHeight: hasGif ? 'calc(100dvh - 200px)' : 'calc(100dvh - 150px)' }}
           />
         </motion.div>
 
@@ -154,16 +163,18 @@ export function ResultScreen() {
               <div className="text-lg font-semibold">Scan untuk unduh</div>
               <p className="mt-1 text-sm text-white/55">
                 {isSupabaseConfigured
-                  ? `Foto tersedia ${LIMITS.retentionDays} hari. Bisa disimpan ke galeri atau Google Drive.`
+                  ? `${hasGif ? 'Foto & GIF' : 'Foto'} tersedia ${LIMITS.retentionDays} hari. Bisa disimpan ke galeri atau Google Drive.`
                   : 'Mode lokal — QR aktif setelah Supabase diatur.'}
               </p>
               <UploadBadge status={uploadStatus} error={uploadError} />
             </div>
           </div>
 
-          {/* Simpan */}
-          <div>
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-widest text-white/50">Simpan ke</h3>
+          {/* Simpan: foto, dan GIF kalau mode GIF. Keduanya tetap terpasang supaya status & auto-Drive jalan. */}
+          <div className={hasGif && view === 'gif' ? 'hidden' : undefined}>
+            <h3 className="mb-2 text-sm font-semibold uppercase tracking-widest text-white/50">
+              {hasGif ? 'Simpan foto ke' : 'Simpan ke'}
+            </h3>
             <SaveOptions
               getBlob={getBlob}
               fileName={photoFileName(result.id, result.createdAt)}
@@ -171,6 +182,17 @@ export function ResultScreen() {
               autoDrive={autoDrive}
             />
           </div>
+          {hasGif && (
+            <div className={view === 'gif' ? undefined : 'hidden'}>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-widest text-white/50">Simpan GIF ke</h3>
+              <SaveOptions
+                getBlob={getGif}
+                fileName={photoFileName(result.id, result.createdAt, 'gif')}
+                driveFolder={`Photobooth - ${EVENT.name}`}
+                autoDrive={autoDrive}
+              />
+            </div>
+          )}
 
           <Button size="lg" variant="secondary" onClick={print} disabled={printing}>
             {printing ? <Spinner className="h-5 w-5" /> : <Icon name="printer" />}

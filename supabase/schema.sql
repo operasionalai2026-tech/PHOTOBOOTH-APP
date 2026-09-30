@@ -48,10 +48,14 @@ create table if not exists photo_sessions (
   frame text,
   filter text,
   image_path text not null,
-  size_bytes int,
+  gif_path text,             -- GIF kolase berputar (mode GIF), null untuk foto biasa
+  size_bytes int,            -- total ukuran file di storage (foto + GIF)
   printed boolean default false,
   created_at timestamptz default now()
 );
+-- Upgrade dari versi sebelum fitur GIF.
+alter table photo_sessions add column if not exists gif_path text;
+
 create index if not exists photo_sessions_event_created_idx
   on photo_sessions (event_slug, created_at desc);
 
@@ -66,6 +70,7 @@ create policy "anon insert" on photo_sessions for insert to anon
   with check (
     private.is_active_event(event_slug)
     and image_path = event_slug || '/' || id::text || '.jpg'
+    and (gif_path is null or gif_path = event_slug || '/' || id::text || '.gif')
   );
 create policy "anon read by id" on photo_sessions for select to anon using (true);
 create policy "admin all" on photo_sessions for all to authenticated using (true) with check (true);
@@ -85,9 +90,9 @@ revoke all on function public.mark_printed(uuid) from public;
 grant execute on function public.mark_printed(uuid) to anon, authenticated;
 
 -- ---------- 3. Bucket storage `photos` ----------
--- public read, maks 1 MB, hanya image/jpeg
+-- public read, maks 1 MB, hanya image/jpeg (foto) dan image/gif (mode GIF)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('photos', 'photos', true, 1048576, array['image/jpeg'])
+values ('photos', 'photos', true, 1048576, array['image/jpeg', 'image/gif'])
 on conflict (id) do update
   set public = excluded.public,
       file_size_limit = excluded.file_size_limit,
@@ -97,7 +102,7 @@ on conflict (id) do update
 drop policy if exists "photos anon upload to event folder" on storage.objects;
 drop policy if exists "photos admin all" on storage.objects;
 
--- Anon hanya boleh upload file .jpg langsung di dalam folder {event_slug}/ milik event aktif
+-- Anon hanya boleh upload file .jpg / .gif langsung di dalam folder {event_slug}/ milik event aktif
 -- (tidak bisa update/overwrite/hapus, tidak bisa list).
 create policy "photos anon upload to event folder" on storage.objects
   for insert to anon
@@ -105,7 +110,7 @@ create policy "photos anon upload to event folder" on storage.objects
     bucket_id = 'photos'
     and array_length(storage.foldername(name), 1) = 1
     and private.is_active_event((storage.foldername(name))[1])
-    and lower(storage.extension(name)) = 'jpg'
+    and lower(storage.extension(name)) in ('jpg', 'gif')
   );
 
 -- Admin (user login magic link) boleh lihat & hapus semua file di bucket photos.

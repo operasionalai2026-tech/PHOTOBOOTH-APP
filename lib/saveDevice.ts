@@ -3,11 +3,11 @@
 
 import { EVENT } from '@/config/event';
 
-export function photoFileName(id: string, createdAt: Date | string = new Date()): string {
+export function photoFileName(id: string, createdAt: Date | string = new Date(), ext: 'jpg' | 'gif' = 'jpg'): string {
   const d = new Date(createdAt);
   const pad = (n: number) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
-  return `${EVENT.slug}-${stamp}-${id.slice(0, 6)}.jpg`;
+  return `${EVENT.slug}-${stamp}-${id.slice(0, 6)}.${ext}`;
 }
 
 function isTouchDevice() {
