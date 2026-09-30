@@ -9,7 +9,7 @@ import { ViewTabs } from '@/components/booth/ViewTabs';
 import { SaveOptions, Spinner } from '@/components/booth/SaveOptions';
 import { Backdrop } from '@/components/ui/Backdrop';
 import { Icon } from '@/components/ui/Icon';
-import { EVENT, LIMITS } from '@/config/event';
+import { EVENT, LIMITS, RETENTION_LABEL } from '@/config/event';
 import { photoFileName } from '@/lib/saveDevice';
 import { fetchPhotoSession, isSupabaseConfigured, publicImageUrl, type PhotoSession } from '@/lib/supabase';
 
@@ -79,7 +79,7 @@ function DownloadView() {
         <p className="mt-2 text-white/60">
           {state.kind === 'error'
             ? state.message
-            : `Foto mungkin sudah dihapus (disimpan maksimal ${LIMITS.retentionDays} hari) atau belum terunggah.`}
+            : `Foto mungkin sudah dihapus (disimpan maksimal ${RETENTION_LABEL}) atau belum terunggah.`}
         </p>
         <button
           type="button"
@@ -111,8 +111,14 @@ function DownloadView() {
 }
 
 function Ready({ row, url }: { row: PhotoSession; url: string }) {
-  const expires = new Date(new Date(row.created_at).getTime() + LIMITS.retentionDays * 86_400_000);
-  const daysLeft = Math.max(0, Math.ceil((expires.getTime() - Date.now()) / 86_400_000));
+  const expires = new Date(new Date(row.created_at).getTime() + LIMITS.retentionHours * 3_600_000);
+  const msLeft = Math.max(0, expires.getTime() - Date.now());
+  const left =
+    msLeft >= 48 * 3_600_000
+      ? `${Math.floor(msLeft / 86_400_000)} hari`
+      : msLeft >= 3_600_000
+        ? `${Math.floor(msLeft / 3_600_000)} jam`
+        : `${Math.max(1, Math.ceil(msLeft / 60_000))} menit`;
 
   const gifUrl = row.gif_path ? publicImageUrl(row.gif_path) : null;
   const [view, setView] = useState<'photo' | 'gif'>(gifUrl ? 'gif' : 'photo');
@@ -162,12 +168,12 @@ function Ready({ row, url }: { row: PhotoSession; url: string }) {
         <Icon name="cloud" className="mt-0.5 h-5 w-5 shrink-0" />
         <div>
           <div className="font-semibold">
-            {gifUrl ? 'Foto & GIF' : 'Foto'} tersedia {LIMITS.retentionDays} hari
+            {gifUrl ? 'Foto & GIF' : 'Foto'} tersedia {RETENTION_LABEL}
           </div>
           <div className="text-amber-100/70">
-            Sisa {daysLeft} hari (sampai{' '}
-            {expires.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}). Simpan sekarang
-            supaya tidak hilang.
+            Sisa ±{left} (sampai{' '}
+            {expires.toLocaleString('id-ID', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}).
+            Simpan sekarang supaya tidak hilang.
           </div>
         </div>
       </div>

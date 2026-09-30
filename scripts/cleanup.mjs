@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Hapus foto (file storage + baris DB) yang lebih tua dari RETENTION_DAYS (default 30).
+// Hapus foto & GIF (file storage + baris DB) yang lebih tua dari RETENTION_HOURS (default 24 jam).
 // Dijalankan oleh GitHub Actions. Butuh SUPABASE_SERVICE_ROLE_KEY (secret key `sb_secret_...` atau
 // service_role lama) — HANYA dari GitHub Secrets,
 // jangan pernah dipakai di frontend.
@@ -10,7 +10,12 @@
 
 const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const retentionDays = Number(process.env.RETENTION_DAYS || 30);
+// RETENTION_DAYS (versi lama) masih didukung; RETENTION_HOURS yang dipakai sekarang.
+const retentionHours = process.env.RETENTION_HOURS
+  ? Number(process.env.RETENTION_HOURS)
+  : process.env.RETENTION_DAYS
+    ? Number(process.env.RETENTION_DAYS) * 24
+    : 24;
 const bucket = process.env.STORAGE_BUCKET || 'photos';
 const dryRun = process.env.DRY_RUN === '1';
 const BATCH = 100;
@@ -37,8 +42,13 @@ async function api(path, init = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-const cutoff = new Date(Date.now() - retentionDays * 86_400_000).toISOString();
-console.log(`Cleanup foto sebelum ${cutoff} (retensi ${retentionDays} hari)${dryRun ? ' [DRY RUN]' : ''}`);
+if (!(retentionHours > 0)) {
+  console.error(`RETENTION_HOURS tidak valid: ${process.env.RETENTION_HOURS}`);
+  process.exit(1);
+}
+
+const cutoff = new Date(Date.now() - retentionHours * 3_600_000).toISOString();
+console.log(`Cleanup foto sebelum ${cutoff} (retensi ${retentionHours} jam)${dryRun ? ' [DRY RUN]' : ''}`);
 
 let totalRows = 0;
 let totalBytes = 0;

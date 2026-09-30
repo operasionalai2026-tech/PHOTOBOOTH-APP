@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { downloadUrl, EVENT, LIMITS } from '@/config/event';
+import { downloadUrl, EVENT, RETENTION_LABEL } from '@/config/event';
 import { getFilter } from '@/config/filters';
 import { compressForUpload } from '@/lib/compress';
 import { enqueue, patchMeta, processQueue, subscribe } from '@/lib/offlineQueue';
@@ -163,7 +163,7 @@ export function ResultScreen() {
               <div className="text-lg font-semibold">Scan untuk unduh</div>
               <p className="mt-1 text-sm text-white/55">
                 {isSupabaseConfigured
-                  ? `${hasGif ? 'Foto & GIF' : 'Foto'} tersedia ${LIMITS.retentionDays} hari. Bisa disimpan ke galeri atau Google Drive.`
+                  ? `${hasGif ? 'Foto & GIF' : 'Foto'} tersedia ${RETENTION_LABEL}. Bisa disimpan ke galeri atau Google Drive.`
                   : 'Mode lokal — QR aktif setelah Supabase diatur.'}
               </p>
               <UploadBadge status={uploadStatus} error={uploadError} />

@@ -37,7 +37,8 @@ export const PREPARE_TEXT = {
 
 /** Aturan free tier Supabase + retensi foto. */
 export const LIMITS = {
-  retentionDays: 30,
+  /** Foto & GIF dihapus dari Supabase setelah sekian jam (samakan dengan RETENTION_HOURS di workflow). */
+  retentionHours: 24,
   storageQuotaBytes: 1024 * 1024 * 1024, // 1 GB
   bandwidthQuotaBytes: 5 * 1024 * 1024 * 1024, // 5 GB / bulan
   storageWarnRatio: 0.8,
@@ -51,6 +52,15 @@ export const LIMITS = {
   gifPixels: 300_000,
   gifMaxBytes: 900 * 1024,
 } as const;
+
+/** Durasi yang enak dibaca: 24 → "24 jam", 72 → "3 hari". */
+export function formatHours(hours: number): string {
+  if (hours >= 48 && hours % 24 === 0) return `${hours / 24} hari`;
+  return `${Math.round(hours)} jam`;
+}
+
+/** Contoh: "24 jam". Dipakai di layar hasil, halaman tamu, admin, dan kebijakan privasi. */
+export const RETENTION_LABEL = formatHours(LIMITS.retentionHours);
 
 export const STORAGE_BUCKET = 'photos';
 

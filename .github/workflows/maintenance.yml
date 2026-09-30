@@ -2,8 +2,10 @@ name: Maintenance (keep-alive & cleanup)
 
 on:
   schedule:
-    # Tiap 3 hari jam 03:17 UTC (menit acak supaya tidak antre di jam :00)
+    # Keep-alive: tiap 3 hari jam 03:17 UTC (menit acak supaya tidak antre di jam :00)
     - cron: '17 3 */3 * *'
+    # Cleanup: tiap jam di menit ke-41 → foto terhapus 24–25 jam setelah diambil
+    - cron: '41 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -17,6 +19,7 @@ permissions:
 jobs:
   keep-alive:
     name: Keep-alive Supabase
+    if: github.event_name != 'schedule' || github.event.schedule == '17 3 */3 * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -37,7 +40,8 @@ jobs:
             -o /dev/null -w "HTTP %{http_code}\n"
 
   cleanup:
-    name: Hapus foto > 30 hari
+    name: Hapus foto > 24 jam
+    if: github.event_name != 'schedule' || github.event.schedule == '41 * * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -49,6 +53,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          RETENTION_DAYS: '30'
+          # Samakan dengan LIMITS.retentionHours di config/event.ts
+          RETENTION_HOURS: '24'
           DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
         run: node scripts/cleanup.mjs

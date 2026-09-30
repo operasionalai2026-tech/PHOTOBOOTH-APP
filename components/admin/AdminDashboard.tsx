@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SaveOptions, Spinner } from '@/components/booth/SaveOptions';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { EVENT, LIMITS, STORAGE_BUCKET } from '@/config/event';
+import { EVENT, formatHours, LIMITS, RETENTION_LABEL, STORAGE_BUCKET } from '@/config/event';
 import { connectDrive, isDriveConfigured, isDriveConnected, uploadToDrive } from '@/lib/googleDrive';
 import { downloadBlob, photoFileName } from '@/lib/saveDevice';
 import { getSupabase, publicImageUrl, type PhotoSession } from '@/lib/supabase';
@@ -323,9 +323,9 @@ function QuotaStats({ stats }: { stats: StatRow[] | null }) {
   const warn = ratio >= LIMITS.storageWarnRatio;
   const printed = stats.filter((r) => r.printed).length;
   const today = stats.filter((r) => new Date(r.created_at).toDateString() === new Date().toDateString()).length;
-  const expiringSoon = stats.filter(
-    (r) => Date.now() - new Date(r.created_at).getTime() > (LIMITS.retentionDays - 3) * 86_400_000,
-  ).length;
+  // "Segera terhapus" = sudah melewati 7/8 masa simpan (24 jam → umur > 21 jam).
+  const soonHours = Math.floor(LIMITS.retentionHours * 0.875);
+  const expiringSoon = stats.filter((r) => Date.now() - new Date(r.created_at).getTime() > soonHours * 3_600_000).length;
   const remainingPhotos = Math.max(0, Math.floor((LIMITS.storageQuotaBytes - estimate) / avg));
 
   return (
@@ -335,7 +335,7 @@ function QuotaStats({ stats }: { stats: StatRow[] | null }) {
           <Icon name="cloud-off" className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
             <b>Storage hampir penuh ({Math.round(ratio * 100)}%).</b> Unduh ZIP / simpan ke Drive lalu hapus foto lama, atau
-            tunggu cleanup otomatis ({LIMITS.retentionDays} hari). Saat penuh, booth tetap jalan & foto disimpan lokal.
+            tunggu cleanup otomatis ({RETENTION_LABEL}). Saat penuh, booth tetap jalan & foto disimpan lokal.
           </div>
         </div>
       )}
@@ -363,7 +363,7 @@ function QuotaStats({ stats }: { stats: StatRow[] | null }) {
         <Stat
           label="Segera terhapus"
           value={expiringSoon.toLocaleString('id-ID')}
-          sub={`umur > ${LIMITS.retentionDays - 3} hari`}
+          sub={`umur > ${formatHours(soonHours)} · dihapus di ${RETENTION_LABEL}`}
         />
       </div>
       <p className="mt-3 text-xs text-white/40">

@@ -8,7 +8,7 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
 | Frontend | Next.js 14 `output: 'export'` (static, tanpa server), Tailwind CSS, Framer Motion, Zustand |
 | Hosting | Cloudflare Pages (free, boleh komersial) |
 | Backend | Supabase Free — Postgres + Storage + Auth, diakses langsung dari browser (anon key + RLS) |
-| Cron | GitHub Actions — keep-alive & hapus foto > 30 hari |
+| Cron | GitHub Actions — keep-alive & hapus foto > 24 jam (tiap jam) |
 | Simpan ke Drive | Google Identity Services + Drive API (scope `drive.file`) langsung dari browser |
 | Library | qrcode, browser-image-compression, jszip (MIT) · font Google Fonts · frame & suara dibuat sendiri (Canvas / Web Audio) |
 
@@ -43,7 +43,7 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
   - *Google Drive*: login Google sekali, foto masuk ke folder `Photobooth - <nama event>`.
     Operator bisa menyalakan **Auto-simpan ke Drive** di ⚙️ Pengaturan (semua foto otomatis ter-backup full-res).
 - **Cetak**: ukuran 4x6 tanpa margin; layout strip otomatis digandakan 2 strip per kertas.
-- **QR code** → `/p?id=…` (halaman unduh tamu, info “Foto tersedia 30 hari”).
+- **QR code** → `/p?id=…` (halaman unduh tamu, info “Foto tersedia 24 jam” + sisa waktunya).
 - **Offline-first**: foto selalu masuk IndexedDB dulu lalu diunggah di background; kalau offline /
   kuota penuh / error, foto tetap bisa dicetak & disimpan, dan dicoba ulang otomatis (tiap 20 detik + saat online).
   QR tetap valid karena ID dibuat di browser — halaman tamu menunggu sampai foto masuk.
@@ -56,7 +56,10 @@ Photobooth berbasis web untuk event: kamera → hitung mundur → pilih frame & 
 - Foto dikompres sebelum upload: maks ±500 KB, sisi terpanjang 1800px, JPEG ~0.8.
   **Full-res tidak di-upload ke Supabase** — hanya untuk cetak, simpan ke perangkat, dan Google Drive (kuota Drive milik pengguna).
 - Bucket `photos`: public read, maks 1 MB, hanya `image/jpeg`, anon hanya boleh upload ke folder `{event_slug}/`.
-- Foto dihapus otomatis setelah 30 hari, keep-alive tiap 3 hari (GitHub Actions).
+- Foto & GIF dihapus otomatis dari Supabase setelah **24 jam** (job cleanup GitHub Actions jalan tiap jam,
+  jadi foto hilang 24–25 jam setelah diambil); keep-alive tiap 3 hari. Salinan di Perangkat / Google Drive
+  tidak ikut terhapus. Mengubah masa simpan: `LIMITS.retentionHours` di `config/event.ts` **dan**
+  `RETENTION_HOURS` di `.github/workflows/maintenance.yml` (samakan keduanya).
 - Service role key **hanya** di GitHub Secrets.
 
 ---

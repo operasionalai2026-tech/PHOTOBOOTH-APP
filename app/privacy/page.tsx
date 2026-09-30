@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Backdrop } from '@/components/ui/Backdrop';
-import { EVENT, LIMITS } from '@/config/event';
+import { EVENT, RETENTION_LABEL } from '@/config/event';
 
 export const metadata: Metadata = {
   title: `Kebijakan Privasi — ${EVENT.name}`,
@@ -35,7 +35,7 @@ export default function PrivacyPage() {
 
         <Section title="Berapa lama foto disimpan">
           <p>
-            Foto disimpan di server (Supabase) paling lama <b>{LIMITS.retentionDays} hari</b>, lalu dihapus otomatis.
+            Foto disimpan di server (Supabase) paling lama <b>{RETENTION_LABEL}</b>, lalu dihapus otomatis.
             Siapa pun yang memegang link/QR foto dapat melihat dan mengunduhnya selama masa itu, jadi jangan bagikan
             link foto yang tidak ingin dilihat orang lain.
           </p>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
 
         <Section title="Hapus foto / kontak">
           <p>
-            Ingin fotomu dihapus sebelum {LIMITS.retentionDays} hari?{' '}
+            Ingin fotomu dihapus sebelum {RETENTION_LABEL}?{' '}
             {CONTACT ? (
               <>
                 Hubungi{' '}
